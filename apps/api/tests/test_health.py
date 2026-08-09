@@ -19,6 +19,23 @@ def test_data_availability() -> None:
     assert response.json()["nightlights"]["start"] == "2012-04"
 
 
+def test_nightlight_difference_tile_metadata() -> None:
+    visualization = {
+        "tiles": ["https://earthengine.example/{z}/{x}/{y}"],
+        "min": -4.0,
+        "max": 4.0,
+        "neutral_threshold": 0.3,
+    }
+    with patch("app.main.viirs_difference_tile", return_value=visualization):
+        response = client.get("/api/v1/map/tiles/nightlight/difference?base_year=2014&compare_year=2024")
+
+    assert response.status_code == 200
+    assert response.json()["operation"] == "compare_year_minus_base_year"
+    assert response.json()["base_year"] == 2014
+    assert response.json()["compare_year"] == 2024
+    assert response.json()["neutral_threshold"] == 0.3
+
+
 def test_database_health_uses_supabase_sdk() -> None:
     supabase = MagicMock()
     supabase.table.return_value.select.return_value.limit.return_value.execute.return_value = MagicMock()

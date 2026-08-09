@@ -18,7 +18,7 @@ from .schemas import DataAvailability, DataRange, ReportJob, ReportRequest
 from .services.evidence import build_evidence_package
 from .services.hansen import hansen_tile_url
 from .services.persisted_stats import load_persisted_stats, stats_to_timeseries
-from .services.viirs import VIIRS_MONTHLY, initialize_earth_engine, viirs_tile_url
+from .services.viirs import VIIRS_MONTHLY, initialize_earth_engine, viirs_difference_tile, viirs_tile_url
 from .services.hansen import HANSEN_GFC
 
 settings = get_settings()
@@ -138,6 +138,23 @@ def data_status() -> dict[str, object]:
     except Exception as error:
         _supabase_error(error, "data status")
     return {"connected": True, "tables": counts}
+
+
+@app.get("/api/v1/map/tiles/nightlight/difference")
+def nightlight_difference_tile(base_year: int = Query(..., ge=2012, le=2026), compare_year: int = Query(..., ge=2012, le=2026)) -> dict[str, object]:
+    try:
+        visualization = viirs_difference_tile(base_year, compare_year)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Could not create VIIRS difference tile") from error
+    return {
+        "base_year": base_year,
+        "compare_year": compare_year,
+        "dataset": "NOAA VIIRS DNB Monthly",
+        "operation": "compare_year_minus_base_year",
+        **visualization,
+    }
 
 
 @app.get("/api/v1/map/tiles/nightlight/{year}")

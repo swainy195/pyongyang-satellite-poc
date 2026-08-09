@@ -47,6 +47,35 @@ async function updateNightlightLayer(
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
 
+async function updateNightlightDifferenceLayer(
+  map: maplibregl.Map,
+  baseYear: number,
+  compareYear: number,
+  visible: boolean,
+  metric: string,
+) {
+  const layerId = "viirs-nightlight-difference";
+  const shouldShow = visible && metric === "nightlight";
+  if (!shouldShow) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "none");
+    return;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/nightlight/difference?base_year=${baseYear}&compare_year=${compareYear}`);
+  if (!response.ok) throw new Error(`VIIRS difference tile metadata HTTP ${response.status}`);
+  const payload = await response.json() as { tiles: string[] };
+  const sourceId = "viirs-nightlight-difference-source";
+  const source = map.getSource(sourceId);
+  if (source && "setTiles" in source) {
+    (source as maplibregl.RasterTileSource).setTiles(payload.tiles);
+  } else if (!source) {
+    map.addSource(sourceId, { type: "raster", tiles: payload.tiles, tileSize: 256 });
+    const beforeId = map.getLayer("admin-boundaries-fill") ? "admin-boundaries-fill" : map.getLayer("facilities-points") ? "facilities-points" : undefined;
+    map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.82 } }, beforeId);
+  }
+  if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
+}
+
 async function updateForestLayer(
   map: maplibregl.Map,
   year: number,
@@ -183,6 +212,11 @@ async function prepareSatelliteLayers(
   await waitForBackend();
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
+      if (mode === "difference" && metric === "nightlight") {
+        await updateNightlightDifferenceLayer(map, baseYear, compareYear, showTrends, metric);
+        applyComparisonOpacity(map, mode);
+        return;
+      }
       await Promise.all([
         updateBaseRasterLayer(map, "nightlight", baseYear, showTrends, metric),
         updateBaseRasterLayer(map, "forest", baseYear, showTrends, metric),
@@ -287,6 +321,13 @@ export default function MapCanvas() {
   }, []);
   useEffect(() => {
     if (!map.current?.isStyleLoaded() || !satelliteInitializedRef.current) return;
+    if (mode === "difference" && metric === "nightlight") {
+      if (map.current.getLayer("viirs-nightlight-base")) map.current.setLayoutProperty("viirs-nightlight-base", "visibility", "none");
+      if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
+      void updateNightlightDifferenceLayer(map.current, baseYear, compareYear, showTrends, metric).catch(() => undefined);
+      return;
+    }
+    if (map.current.getLayer("viirs-nightlight-difference")) map.current.setLayoutProperty("viirs-nightlight-difference", "visibility", "none");
     void updateNightlightLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
     void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
     void updateBaseRasterLayer(map.current, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
