@@ -140,7 +140,7 @@ async function updateBaseRasterLayer(
 }
 
 function applyComparisonOpacity(map: maplibregl.Map, mode: string) {
-  const baseOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.08 : 0.35;
+  const baseOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.08 : 0.62;
   const compareOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.85 : 0.62;
   for (const id of ["viirs-nightlight-base", "hansen-forest-base"]) {
     if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", baseOpacity);
