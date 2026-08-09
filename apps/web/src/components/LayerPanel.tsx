@@ -1,29 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAnalysisStore, type CompareMode, type Metric } from "../store";
-import { apiBaseUrl } from "../api";
-
-
-type SearchResult = { id: number; name: string; category: string; longitude: number; latitude: number };
-type SearchPhase = "idle" | "searching" | "retrying" | "error";
-
-const SEARCH_TIMEOUT_MS = 70_000;
-const SEARCH_RETRY_DELAY_MS = 1_500;
-
-class SearchHttpError extends Error {
-  constructor(public readonly status: number) {
-    super(`Facility search failed with HTTP ${status}`);
-    this.name = "SearchHttpError";
-  }
-}
-
-function isRetryableSearchError(error: unknown) {
-  if (error instanceof SearchHttpError) return [502, 503, 504].includes(error.status);
-  return error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError");
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-}
+import { isFacilityIndexLoaded, searchFacilityIndex, type SearchResult } from "../services/facilitySearch";
+type SearchPhase = "idle" | "loading" | "searching" | "error";
 
 export default function LayerPanel() {
   const state = useAnalysisStore();
@@ -33,11 +11,9 @@ export default function LayerPanel() {
   const [searchError, setSearchError] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
   const requestIdRef = useRef(0);
-  const activeControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
     requestIdRef.current += 1;
-    activeControllerRef.current?.abort();
   }, []);
 
   async function searchFacilities(event: React.FormEvent) {
@@ -48,44 +24,19 @@ export default function LayerPanel() {
       return;
     }
     const requestId = ++requestIdRef.current;
-    activeControllerRef.current?.abort();
     setSearching(true);
     setSearchError(false);
-    setSearchPhase("searching");
+    setSearchPhase(isFacilityIndexLoaded() ? "searching" : "loading");
     try {
-      let payload: { items: SearchResult[] } | null = null;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        if (attempt > 0) setSearchPhase("retrying");
-        const controller = new AbortController();
-        activeControllerRef.current = controller;
-        const timeoutId = window.setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
-        try {
-          const response = await fetch(
-            `${apiBaseUrl}/api/v1/facilities?q=${encodeURIComponent(trimmed)}&limit=20`,
-            { signal: controller.signal },
-          );
-          if (!response.ok) throw new SearchHttpError(response.status);
-          payload = await response.json() as { items: SearchResult[] };
-          break;
-        } catch (error) {
-          if (requestId !== requestIdRef.current) return;
-          if (attempt === 0 && isRetryableSearchError(error)) {
-            await wait(SEARCH_RETRY_DELAY_MS);
-            continue;
-          }
-          throw error;
-        } finally {
-          window.clearTimeout(timeoutId);
-        }
-      }
-      if (requestId === requestIdRef.current && payload) {
-        setResults(payload.items ?? []);
+      const matches = await searchFacilityIndex(trimmed);
+      if (requestId === requestIdRef.current) {
+        setResults(matches);
         setSearchError(false);
         setSearchPhase("idle");
       }
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-      console.error("Facility search failed", error);
+      console.error("Facility search index failed", error);
       setSearchError(true);
       setSearchPhase("error");
     } finally {
@@ -113,8 +64,8 @@ export default function LayerPanel() {
             </button>
           </li>)}
         </ul>}
-        {searching && <p className="search-status" role="status">{searchPhase === "retrying" ? "검색 서버를 준비하고 있습니다. 잠시만 기다려주세요." : "시설을 검색하고 있습니다."}</p>}
-        {query.trim() && !searching && searchError && <p className="search-empty" role="alert">검색 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.</p>}
+        {searching && <p className="search-status" role="status">{searchPhase === "loading" ? "시설 검색 데이터를 불러오고 있습니다." : "시설을 검색하고 있습니다."}</p>}
+        {query.trim() && !searching && searchError && <p className="search-empty" role="alert">시설 검색 데이터를 불러올 수 없습니다.</p>}
         {query.trim() && !searching && !searchError && results.length === 0 && <p className="search-empty">검색 결과가 없습니다.</p>}
       </section>
 
