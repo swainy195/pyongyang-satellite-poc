@@ -533,19 +533,57 @@ def create_report(request: ReportRequest) -> ReportJob:
 처리 버전: `report-v1`
 """
     if request.facility_ids:
-        markdown += "\n## Facility analysis\n\n"
+        markdown += "\n## 시설 분석\n\n"
         for raw_facility_id in request.facility_ids:
             try:
+                facility_payload = facility_detail(int(raw_facility_id))
                 analysis = facility_analysis(int(raw_facility_id), request.period_start.year, request.period_end.year)
+                trends_payload = facility_trends(
+                    int(raw_facility_id),
+                    request.period_start.year,
+                    request.period_end.year,
+                    5,
+                )
+                facility = facility_payload["facility"]
+                series = analysis["series"]
+                nightlight_rows = [row for row in series["nightlight"] if row.get("mean_radiance") is not None]
+                base_radiance = nightlight_rows[0].get("mean_radiance") if nightlight_rows else None
+                compare_radiance = nightlight_rows[-1].get("mean_radiance") if nightlight_rows else None
                 markdown += (
-                    f"- Facility ID: `{raw_facility_id}`\n"
-                    f"- Observation: {analysis['observation']}\n"
-                    f"- Interpretation: {analysis['interpretation']}\n"
-                    f"- Confidence: {analysis['confidence']}\n"
-                    f"- Sources: {', '.join(analysis['sources'])}\n\n"
+                    "### 1. 분석 대상\n\n"
+                    f"- 시설명: {facility.get('name')}\n"
+                    f"- 분류: {facility.get('category') or '정보 없음'}\n"
+                    f"- 주소: {facility.get('address') or '정보 없음'}\n"
+                    f"- 분석 기간: {request.period_start} ~ {request.period_end}\n\n"
+                    "### 2. 핵심 분석 결과\n\n"
+                    f"- 야간 불빛 변화: {analysis.get('nightlightChangePct') if analysis.get('nightlightChangePct') is not None else '데이터 없음'}%\n"
+                    f"- 야간 불빛 기준값: {base_radiance if base_radiance is not None else '데이터 없음'}\n"
+                    f"- 야간 불빛 비교값: {compare_radiance if compare_radiance is not None else '데이터 없음'}\n"
+                    f"- 산림손실: {analysis.get('forestLossKm2') if analysis.get('forestLossKm2') is not None else '데이터 없음'} km²\n\n"
+                    "### 3. 관련 동향\n\n"
+                )
+                trend_items = trends_payload["items"]
+                if trend_items:
+                    for trend in trend_items:
+                        markdown += f"- {trend.get('date') or '날짜 없음'} · {trend.get('title') or '제목 없음'}\n"
+                        if trend.get("summary"):
+                            markdown += f"  - {trend['summary']}\n"
+                        if trend.get("source_url"):
+                            markdown += f"  - 원문: {trend['source_url']}\n"
+                else:
+                    markdown += "- 연결된 관련 동향이 없습니다.\n"
+                markdown += (
+                    "\n### 4. 관찰\n\n"
+                    f"{analysis.get('observation', '데이터 없음')}\n\n"
+                    "### 5. 해석\n\n"
+                    f"{analysis.get('interpretation', '데이터 없음')}\n\n"
+                    "### 6. 주의사항\n\n"
+                    "위성 관측값과 관련 동향은 변화 탐색을 위한 참고 자료입니다. 단일 지표나 동향만으로 시설 운영 상태 또는 변화 원인을 확정할 수 없습니다.\n\n"
+                    "### 7. 데이터 출처\n\n"
+                    f"- 시설정보 DB\n- NOAA VIIRS DNB\n- Hansen Global Forest Change\n- 관련 동향 데이터\n- 신뢰도: {analysis.get('confidence', '관측 기반 참고')}\n\n"
                 )
             except HTTPException as error:
-                markdown += f"- Facility ID `{raw_facility_id}`: analysis unavailable ({error.detail})\n\n"
+                markdown += f"- 시설 ID `{raw_facility_id}`: 분석 정보를 불러오지 못했습니다. ({error.detail})\n\n"
     REPORTS[report_id] = {
         "id": report_id,
         "status": "completed",

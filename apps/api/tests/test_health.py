@@ -134,3 +134,39 @@ def test_facility_trends_returns_latest_period_items() -> None:
     assert response.status_code == 200
     assert response.json()["items"][0]["title"] == "시설 관련 동향"
     assert response.json()["items"][0]["summary"] == "공개 자료 요약"
+
+
+def test_report_contains_facility_analysis_sections() -> None:
+    with patch("app.main.data_status", return_value={"tables": {"facilities": 1718}}), patch(
+        "app.main.build_evidence_package", return_value={"status": "ok"}
+    ), patch(
+        "app.main.facility_detail",
+        return_value={"facility": {"name": "동평양화력발전소", "category": "산업/경제 · 전력", "address": "평양직할시"}},
+    ), patch(
+        "app.main.facility_analysis",
+        return_value={
+            "nightlightChangePct": 201.7,
+            "forestLossKm2": 0.0,
+            "observation": "관측 내용",
+            "interpretation": "참고 해석",
+            "confidence": "관측 기반 참고",
+            "series": {"nightlight": [{"year": 2014, "mean_radiance": 1.0}, {"year": 2024, "mean_radiance": 3.0}]},
+        },
+    ), patch(
+        "app.main.facility_trends",
+        return_value={"items": [{"date": "2024-03-12", "title": "관련 동향", "summary": "동향 요약", "source_url": "https://example.com"}]},
+    ):
+        response = client.post("/api/v1/reports", json={
+            "admin_code": "ALL",
+            "period_start": "2014-01-01",
+            "period_end": "2024-12-31",
+            "facility_ids": ["320344"],
+            "metrics": ["combined"],
+        })
+
+    assert response.status_code == 202
+    markdown = client.get(f"/api/v1/reports/{response.json()['id']}").json()["markdown"]
+    assert "동평양화력발전소" in markdown
+    assert "관련 동향" in markdown
+    assert "관측 내용" in markdown
+    assert "데이터 출처" in markdown
