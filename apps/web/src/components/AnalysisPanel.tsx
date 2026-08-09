@@ -216,7 +216,7 @@ export default function AnalysisPanel() {
     </aside> : null;
   }
   const isCombined = metric === "combined";
-  const integratedObservation = `${period.start}~${period.end} 야간 불빛 관측값은 ${formatPercent(nightlightChangePct)} 변화했고, 같은 기간 산림손실은 ${formatArea(forestLossTotal)}로 집계되었습니다.${trendsStatus === "ready" ? ` 연결된 관련 동향 ${trends.length}건이 확인됩니다.` : ""}`;
+  const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
   return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}`} aria-live="polite">
     <div className="analysis-heading">
       <div><span className="analysis-eyebrow">{isCombined ? "종합 분석" : "선택 시설 분석"}</span><strong>{facility?.name ?? focus.name}</strong></div>
