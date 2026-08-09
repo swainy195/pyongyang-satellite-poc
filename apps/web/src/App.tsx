@@ -44,18 +44,18 @@ export default function App() {
   return (
     <main className="layout">
       <header>
-        <div><h1>평양 위성정보 변화 분석</h1><p>VIIRS 야간조도 · Hansen 산림변화 · 북한정보포털</p></div>
+        <div className="brand-block"><span className="brand-kicker">북한 위성정보 분석 서비스</span><h1>북한의 변화를 위성으로 살펴보세요</h1><p>주요 시설을 찾고, 과거와 최근의 야간 불빛·산림 변화를 비교할 수 있습니다.</p></div>
         <div className="header-actions">
           {reportStatus && <span role="status">{reportStatus}</span>}
-          <button type="button" onClick={createReport} disabled={!state.focusFacility} title={reportHint} aria-label={reportHint}>분석보고서 생성</button>
+          <button type="button" onClick={createReport} disabled={!state.focusFacility} title={reportHint} aria-label={reportHint}>분석 보고서 만들기</button>
         </div>
       </header>
       <LayerPanel />
       <section className="map-area">
         <MapCanvas />
         <AnalysisPanel />
-        <div className="map-caption"><strong>{metricLabels[state.metric]}</strong><span>{state.baseYear}년 → {state.compareYear}년 · {modeLabels[state.mode]}</span></div>
-        <div className="legend"><strong>{state.metric === "nightlight" ? "VIIRS 야간조도" : state.metric === "forest" ? "Hansen 산림변화" : "위성 변화 종합"}</strong><div className="legend-bar" /><span>낮음 <em>Radiance / 변화량</em> 높음</span></div>
+        <div className="map-caption"><strong>{metricLabels[state.metric]}</strong><span>{state.baseYear}년 → {state.compareYear}년 · {modeLabels[state.mode]}</span>{state.mode === "swipe" && <small>가운데 손잡이를 좌우로 움직여 비교해보세요.</small>}</div>
+        <div className="legend"><strong>{state.metric === "nightlight" ? "야간 불빛 변화" : state.metric === "forest" ? "산림 변화" : "위성 변화 종합"}</strong><span className="legend-source">{state.metric === "nightlight" ? "NOAA VIIRS DNB" : state.metric === "forest" ? "Hansen Global Forest Change" : "VIIRS · Hansen"}</span><div className="legend-bar" /><span>낮음 <em>{state.metric === "nightlight" ? "밝기" : "변화량"}</em> 높음</span></div>
       </section>
       <footer>
         <button type="button" onClick={() => changeYear(-1)} title="이전 연도">이전</button>

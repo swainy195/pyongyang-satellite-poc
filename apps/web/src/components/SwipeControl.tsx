@@ -47,8 +47,8 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   };
 
   return <div ref={railRef} className={`swipe-control${enabled ? " is-enabled" : ""}`} aria-hidden={!enabled}>
-    <div className="swipe-label swipe-label-base">{baseYear}년 기준</div>
-    <div className="swipe-label swipe-label-compare">{compareYear}년 비교</div>
+    <div className="swipe-label swipe-label-base"><strong>{baseYear}년</strong><small>과거</small></div>
+    <div className="swipe-label swipe-label-compare"><strong>{compareYear}년</strong><small>최근</small></div>
     <div className="swipe-rail" />
     <button
       ref={handleRef}
