@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAnalysisStore } from "../store";
+import { apiBaseUrl } from "../api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8001";
 type Point = { year: number; mean_radiance?: number | null; annual_loss_km2?: number | null };
 
 export default function AnalysisPanel() {

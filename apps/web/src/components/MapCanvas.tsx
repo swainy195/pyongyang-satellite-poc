@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { useAnalysisStore } from "../store";
+import { apiBaseUrl } from "../api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({

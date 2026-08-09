@@ -3,8 +3,8 @@ import MapCanvas from "./components/MapCanvas";
 import LayerPanel from "./components/LayerPanel";
 import AnalysisPanel from "./components/AnalysisPanel";
 import { useAnalysisStore } from "./store";
+import { apiBaseUrl } from "./api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8001";
 const metricLabels = { nightlight: "야간조도 변화", forest: "산림변화", combined: "종합 변화" } as const;
 const modeLabels = { swipe: "스와이프 비교", split: "좌우 분할", difference: "변화량", timeline: "타임라인" } as const;
 

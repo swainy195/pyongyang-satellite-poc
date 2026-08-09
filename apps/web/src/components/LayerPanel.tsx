@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAnalysisStore, type CompareMode, type Metric } from "../store";
+import { apiBaseUrl } from "../api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 type SearchResult = { id: number; name: string; category: string; longitude: number; latitude: number };
 
