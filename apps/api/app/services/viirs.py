@@ -10,6 +10,9 @@ from ..config import get_settings
 VIIRS_MONTHLY = "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG"
 PALETTE = ["#111827", "#312e81", "#7e22ce", "#f97316", "#fde047"]
 DIFFERENCE_PALETTE = ["#0891b2", "#67e8f9", "#e5e7eb", "#fdba74", "#f59e0b"]
+# The 2014-2024 ROI distribution has a broad quantized plateau at 0.3605.
+# A 0.5 floor leaves roughly 10% of pixels while suppressing that plateau.
+DIFFERENCE_NEUTRAL_FLOOR = 0.5
 
 
 def _credentials_path() -> str | None:
@@ -79,7 +82,7 @@ def viirs_difference_tile(base_year: int, compare_year: int) -> dict[str, object
     region = ee.Geometry.Rectangle([124, 37, 131, 43], geodesic=False)
     abs_difference = difference.abs().rename("absolute_difference")
     distribution = difference.addBands(abs_difference).reduceRegion(
-        reducer=ee.Reducer.percentile([2, 25, 98]),
+        reducer=ee.Reducer.percentile([2, 50, 98]),
         geometry=region,
         scale=500,
         bestEffort=True,
@@ -87,14 +90,14 @@ def viirs_difference_tile(base_year: int, compare_year: int) -> dict[str, object
     ).getInfo()
     lower = distribution.get("nightlight_difference_p2")
     upper = distribution.get("nightlight_difference_p98")
-    neutral_threshold = distribution.get("absolute_difference_p25")
+    neutral_threshold = distribution.get("absolute_difference_p50")
     if lower is None or upper is None or neutral_threshold is None:
         raise RuntimeError("Could not derive VIIRS difference visualization range")
 
     max_abs = max(abs(float(lower)), abs(float(upper)))
     if max_abs <= 0:
         raise RuntimeError("VIIRS difference range is empty")
-    neutral_threshold = min(float(neutral_threshold), max_abs)
+    neutral_threshold = min(max(float(neutral_threshold), DIFFERENCE_NEUTRAL_FLOOR), max_abs)
     image = difference.updateMask(abs_difference.gte(neutral_threshold))
     map_id = image.getMapId({"min": -max_abs, "max": max_abs, "palette": DIFFERENCE_PALETTE})
     return {

@@ -71,7 +71,7 @@ async function updateNightlightDifferenceLayer(
   } else if (!source) {
     map.addSource(sourceId, { type: "raster", tiles: payload.tiles, tileSize: 256 });
     const beforeId = map.getLayer("admin-boundaries-fill") ? "admin-boundaries-fill" : map.getLayer("facilities-points") ? "facilities-points" : undefined;
-    map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.82 } }, beforeId);
+    map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.62 } }, beforeId);
   }
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
