@@ -113,6 +113,20 @@ export default function LayerPanel() {
         </div>
       </section>
 
+      <section className="control-group display-group" aria-labelledby="display-heading">
+        <div className="section-step">3</div>
+        <div className="section-content">
+          <h3 id="display-heading">지도 표시</h3>
+          <div className="facility-toggle">
+            <button type="button" className={state.showFacilities ? "is-active" : ""} aria-pressed={state.showFacilities} onClick={() => state.setLayerVisible("facilities", !state.showFacilities)}>
+              {state.showFacilities ? "전체 시설 숨기기" : "전체 시설 보기"}
+              <span className="facility-toggle-state">{state.showFacilities ? "ON" : "OFF"}</span>
+            </button>
+            <small>지도에 등록된 주요 시설 위치를 표시합니다.</small>
+          </div>
+        </div>
+      </section>
+
       <details className="advanced-settings">
         <summary>세부 분석 설정</summary>
         <div className="advanced-content">
@@ -135,12 +149,6 @@ export default function LayerPanel() {
             <legend>지도에 표시할 정보</legend>
             <label><input type="checkbox" checked={state.showBoundaries} onChange={(e) => state.setLayerVisible("boundaries", e.target.checked)} /> 행정경계</label>
             <label><input type="checkbox" checked={state.showTrends} onChange={(e) => state.setLayerVisible("trends", e.target.checked)} /> 위성 변화</label>
-            <div className="facility-toggle">
-              <button type="button" className={state.showFacilities ? "is-active" : ""} aria-pressed={state.showFacilities} onClick={() => state.setLayerVisible("facilities", !state.showFacilities)}>
-                {state.showFacilities ? "전체 시설 숨기기" : "전체 시설 보기"}
-              </button>
-              <small>지도에 등록된 주요 시설 위치를 표시합니다.</small>
-            </div>
           </fieldset>
         </div>
       </details>
