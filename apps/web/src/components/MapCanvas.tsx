@@ -121,7 +121,6 @@ export default function MapCanvas() {
   const { showBoundaries, showFacilities, showTrends, baseYear, compareYear, metric, mode, focusFacility } = useAnalysisStore();
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const focusPopup = useRef<maplibregl.Popup | null>(null);
   useEffect(() => {
     if (!container.current || map.current) return;
     map.current = new maplibregl.Map({
@@ -246,11 +245,6 @@ export default function MapCanvas() {
   useEffect(() => {
     if (!map.current || !focusFacility) return;
     map.current.flyTo({ center: [focusFacility.longitude, focusFacility.latitude], zoom: 12, duration: 800 });
-    focusPopup.current?.remove();
-    focusPopup.current = new maplibregl.Popup({ closeButton: true })
-      .setLngLat([focusFacility.longitude, focusFacility.latitude])
-      .setHTML(`<strong>${escapeHtml(focusFacility.name)}</strong><div>시설물을 클릭하면 상세 정보를 확인할 수 있습니다.</div>`)
-      .addTo(map.current);
   }, [focusFacility]);
   useEffect(() => {
     const currentMap = map.current;

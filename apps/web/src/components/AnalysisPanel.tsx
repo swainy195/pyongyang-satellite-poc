@@ -22,15 +22,22 @@ export default function AnalysisPanel() {
   const points = analysis?.series.nightlight ?? [];
   const max = Math.max(...points.map((point) => Number(point.mean_radiance ?? 0)), 1);
   return <aside className="analysis-panel" aria-live="polite">
-    <div className="analysis-heading"><strong>{focus.name}</strong><button type="button" onClick={() => useAnalysisStore.getState().setFocusFacility(null)} aria-label="분석 패널 닫기">×</button></div>
+    <div className="analysis-heading"><div><span className="analysis-eyebrow">선택 시설 분석</span><strong>{focus.name}</strong></div><button type="button" onClick={() => useAnalysisStore.getState().setFocusFacility(null)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button></div>
     {status && <p>{status}</p>}
     {analysis && <>
       <p className="analysis-summary">{analysis.summary}</p>
-      <div className="analysis-section"><strong>관찰</strong><p>{analysis.observation}</p></div>
-      <div className="analysis-section"><strong>해석</strong><p>{analysis.interpretation}</p></div>
-      <div className="analysis-meta"><span>{analysis.confidence}</span><span>{analysis.sources.join(" · ")}</span></div>
-      <div className="analysis-kpis"><span>조도 변화<strong>{analysis.nightlightChangePct == null ? "-" : `${analysis.nightlightChangePct > 0 ? "+" : ""}${analysis.nightlightChangePct}%`}</strong></span><span>산림손실<strong>{analysis.forestLossKm2 == null ? "-" : `${analysis.forestLossKm2} km²`}</strong></span></div>
-      <div className="analysis-chart">{points.map((point) => <div className="analysis-bar" key={point.year} title={`${point.year}: ${point.mean_radiance ?? "-"}`}><i style={{ height: `${Math.max(3, Number(point.mean_radiance ?? 0) / max * 100)}%` }} /><small>{point.year}</small></div>)}</div>
+      <div className="analysis-kpis" aria-label="핵심 분석 지표">
+        <div><span>야간조도 관측값 변화</span><strong>{analysis.nightlightChangePct == null ? "-" : `${analysis.nightlightChangePct > 0 ? "+" : ""}${analysis.nightlightChangePct}%`}</strong></div>
+        <div><span>산림손실</span><strong>{analysis.forestLossKm2 == null ? "-" : `${analysis.forestLossKm2} km²`}</strong></div>
+      </div>
+      <div className="analysis-section analysis-observation"><strong>관찰</strong><p>{analysis.observation}</p></div>
+      <div className="analysis-section analysis-interpretation"><strong>해석</strong><p>{analysis.interpretation}</p></div>
+      <div className="analysis-note"><strong>주의</strong><p>단일 위성자료만으로 시설 운영 원인이나 정책적 결론을 단정하지 않습니다.</p></div>
+      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis.confidence}</span><span>{analysis.sources.join(" · ")}</span></div></div>
+      <div className="analysis-chart-wrap">
+        <strong className="analysis-chart-title">VIIRS 야간조도 연도별 변화</strong>
+        <div className="analysis-chart" role="img" aria-label="VIIRS 야간조도 연도별 변화 그래프">{points.map((point) => <div className="analysis-bar" key={point.year} title={`${point.year}년 · Radiance: ${point.mean_radiance ?? "-"}`} aria-label={`${point.year}년, Radiance ${point.mean_radiance ?? "-"}`}><i style={{ height: `${Math.max(3, Number(point.mean_radiance ?? 0) / max * 100)}%` }} /><small>{point.year}</small></div>)}</div>
+      </div>
     </>}
   </aside>;
 }
