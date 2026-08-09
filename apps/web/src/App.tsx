@@ -2,6 +2,7 @@ import { useState } from "react";
 import MapCanvas from "./components/MapCanvas";
 import LayerPanel from "./components/LayerPanel";
 import AnalysisPanel from "./components/AnalysisPanel";
+import ReportPreview from "./components/ReportPreview";
 import { useAnalysisStore } from "./store";
 import { apiBaseUrl } from "./api";
 
@@ -9,13 +10,18 @@ const metricLabels = { nightlight: "야간조도 변화", forest: "산림변화"
 export default function App() {
   const state = useAnalysisStore();
   const [reportStatus, setReportStatus] = useState("");
+  const [reportPreview, setReportPreview] = useState<{ id: string; markdown: string } | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const changeYear = (delta: number) => {
     state.setYears(state.baseYear, Math.max(2012, Math.min(2025, state.compareYear + delta)));
   };
 
   const createReport = async () => {
-    setReportStatus("보고서 생성 중...");
+    if (!state.focusFacility || reportLoading) return;
+    setReportLoading(true);
+    setReportStatus("보고서를 준비하고 있습니다...");
     try {
       const response = await fetch(`${apiBaseUrl}/api/v1/reports`, {
         method: "POST",
@@ -30,11 +36,24 @@ export default function App() {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const job = await response.json();
-      setReportStatus("보고서 생성 완료");
-      window.open(`${apiBaseUrl}/api/v1/reports/${job.id}/pdf`, "_blank", "noopener,noreferrer");
-    } catch {
-      setReportStatus("보고서 생성 실패");
+      const detailResponse = await fetch(`${apiBaseUrl}/api/v1/reports/${job.id}`);
+      if (!detailResponse.ok) throw new Error(`Report detail HTTP ${detailResponse.status}`);
+      const detail = await detailResponse.json() as { id: string; markdown: string };
+      setReportPreview({ id: detail.id, markdown: detail.markdown });
+      setReportStatus("");
+    } catch (error) {
+      console.error("Report preview creation failed:", error);
+      setReportStatus("보고서를 생성하지 못했습니다.");
+    } finally {
+      setReportLoading(false);
     }
+  };
+
+  const exportPdf = () => {
+    if (!reportPreview || pdfLoading) return;
+    setPdfLoading(true);
+    window.open(`${apiBaseUrl}/api/v1/reports/${reportPreview.id}/pdf`, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => setPdfLoading(false), 1200);
   };
 
   const reportHint = state.focusFacility ? "선택한 시설의 분석보고서를 생성합니다." : "시설을 선택하면 분석보고서를 생성할 수 있습니다.";
@@ -45,7 +64,7 @@ export default function App() {
         <div className="brand-block"><span className="brand-kicker">북한 위성정보 분석 서비스</span><h1>북한의 변화를 위성으로 살펴보세요</h1><p>주요 시설을 찾고, 과거와 최근의 야간 불빛·산림 변화를 비교할 수 있습니다.</p></div>
         <div className="header-actions">
           {reportStatus && <span role="status">{reportStatus}</span>}
-          <button type="button" onClick={createReport} disabled={!state.focusFacility} title={reportHint} aria-label={reportHint}>분석 보고서 만들기</button>
+          <button type="button" onClick={createReport} disabled={!state.focusFacility || reportLoading} title={reportHint} aria-label={reportHint}>{reportLoading ? "보고서를 준비하는 중..." : "분석 보고서 만들기"}</button>
         </div>
       </header>
       <LayerPanel />
@@ -61,6 +80,7 @@ export default function App() {
         <input aria-label="비교연도 탐색" type="range" min="2012" max="2025" value={state.compareYear} onChange={(e) => changeYear(Number(e.target.value) - state.compareYear)} />
         <button type="button" onClick={() => changeYear(-1)} title="연도 재생">재생</button><button type="button" onClick={() => changeYear(1)} title="다음 연도">다음</button>
       </footer>
+      {reportPreview && <ReportPreview reportId={reportPreview.id} markdown={reportPreview.markdown} exporting={pdfLoading} onClose={() => setReportPreview(null)} onExport={exportPdf} />}
     </main>
   );
 }
