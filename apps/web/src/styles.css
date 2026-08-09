@@ -149,6 +149,7 @@ header p { max-width: 760px; }
 .legend-source { color: #9ca3af !important; font-size: 10px !important; }
 .legend-helper { display: block; margin-top: 7px; color: #6b7280; font-size: 10px; line-height: 1.45; }
 .legend-difference .legend-bar { background: linear-gradient(90deg, #0891b2, #67e8f9, #e5e7eb, #fdba74, #f59e0b); }
+.legend-forest .legend-bar { background: linear-gradient(90deg, #f8fafc, #facc15, #f97316, #dc2626, #7f1d1d); }
 .mode-help { margin: -4px 0 12px; color: #6b7280; font-size: 10px; line-height: 1.45; }
 .analysis-guide { margin: 9px 0 0; color: #4b5563; font-size: 12px; line-height: 1.5; }
 .analysis-summary { margin-top: 10px; }

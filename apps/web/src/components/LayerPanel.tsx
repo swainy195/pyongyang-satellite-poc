@@ -22,6 +22,11 @@ const modeOptions: Array<{ value: CompareMode; title: string; description: strin
   { value: "timeline", title: "연도별 보기", description: "시간의 흐름에 따라 야간 불빛 변화를 확인합니다." },
 ];
 
+const forestModeOptions: Array<{ value: CompareMode; title: string; description: string }> = [
+  { value: "difference", title: "산림손실 한눈에 보기", description: "선택 기간에 산림손실이 발생한 지역을 확인합니다." },
+  { value: "timeline", title: "연도별 산림손실 보기", description: "연도별 손실 발생 시점을 순서대로 확인합니다." },
+];
+
 export default function LayerPanel() {
   const state = useAnalysisStore();
   const [query, setQuery] = useState("");
@@ -34,6 +39,10 @@ export default function LayerPanel() {
   useEffect(() => () => {
     requestIdRef.current += 1;
   }, []);
+
+  useEffect(() => {
+    if (state.metric === "forest" && state.mode === "swipe") state.setMode("difference");
+  }, [state.metric, state.mode]);
 
   async function searchFacilities(event: React.FormEvent) {
     event.preventDefault();
@@ -119,7 +128,7 @@ export default function LayerPanel() {
           <div className="mode-selection">
             <h4>어떻게 볼까요?</h4>
             <div className="mode-cards" role="group" aria-label="비교 방식 선택">
-              {modeOptions.map((option) => <button key={option.value} type="button" className={`mode-card mode-${option.value}${state.mode === option.value ? " is-selected" : ""}`} aria-pressed={state.mode === option.value} onClick={() => state.setMode(option.value)}>
+              {(state.metric === "forest" ? forestModeOptions : modeOptions).map((option) => <button key={option.value} type="button" className={`mode-card mode-${option.value}${state.mode === option.value ? " is-selected" : ""}`} aria-pressed={state.mode === option.value} onClick={() => state.setMode(option.value)}>
                 <strong>{option.title}</strong><span>{option.description}</span>
               </button>)}
             </div>

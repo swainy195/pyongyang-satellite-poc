@@ -108,6 +108,39 @@ async function updateForestLayer(
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
 
+async function updateForestPeriodLayer(
+  map: maplibregl.Map,
+  startYear: number,
+  endYear: number,
+  visible: boolean,
+  metric: string,
+) {
+  const layerId = "hansen-forest-loss";
+  const shouldShow = visible && metric === "forest" && startYear <= endYear && endYear <= 2025;
+  if (!shouldShow) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "none");
+    return;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/forest/period?start_year=${startYear}&end_year=${endYear}`);
+  if (!response.ok) throw new Error(`Hansen period tile metadata HTTP ${response.status}`);
+  const payload = await response.json() as { tiles: string[] };
+  const sourceId = "hansen-forest-source";
+  const source = map.getSource(sourceId);
+  if (source && "setTiles" in source) {
+    (source as maplibregl.RasterTileSource).setTiles(payload.tiles);
+  } else if (!source) {
+    map.addSource(sourceId, { type: "raster", tiles: payload.tiles, tileSize: 256 });
+    map.addLayer({
+      id: layerId,
+      type: "raster",
+      source: sourceId,
+      paint: { "raster-opacity": 0.58 },
+    }, map.getLayer("swipe-compare-clip-end") ? "swipe-compare-clip-end" : undefined);
+  }
+  if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
+}
+
 async function updateBaseRasterLayer(
   map: maplibregl.Map,
   type: "nightlight" | "forest",
@@ -139,9 +172,9 @@ async function updateBaseRasterLayer(
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
 
-function applyComparisonOpacity(map: maplibregl.Map, mode: string) {
+function applyComparisonOpacity(map: maplibregl.Map, mode: string, metric = "") {
   const baseOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.08 : 0.62;
-  const compareOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.85 : 0.62;
+  const compareOpacity = mode === "split" ? 0.5 : mode === "difference" && metric === "forest" ? 0.58 : mode === "difference" ? 0.85 : 0.62;
   for (const id of ["viirs-nightlight-base", "hansen-forest-base"]) {
     if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", baseOpacity);
   }
@@ -214,7 +247,12 @@ async function prepareSatelliteLayers(
     try {
       if (mode === "difference" && metric === "nightlight") {
         await updateNightlightDifferenceLayer(map, baseYear, compareYear, showTrends, metric);
-        applyComparisonOpacity(map, mode);
+        applyComparisonOpacity(map, mode, metric);
+        return;
+      }
+      if (mode === "difference" && metric === "forest") {
+        await updateForestPeriodLayer(map, baseYear, compareYear, showTrends, metric);
+        applyComparisonOpacity(map, mode, metric);
         return;
       }
       await Promise.all([
@@ -223,7 +261,7 @@ async function prepareSatelliteLayers(
         updateNightlightLayer(map, compareYear, showTrends, metric),
         updateForestLayer(map, compareYear, showTrends, metric),
       ]);
-      applyComparisonOpacity(map, mode);
+      applyComparisonOpacity(map, mode, metric);
       return;
     } catch (error) {
       if (attempt === 1) throw error;
@@ -331,7 +369,24 @@ export default function MapCanvas() {
     if (mode === "difference" && metric === "nightlight") {
       if (map.current.getLayer("viirs-nightlight-base")) map.current.setLayoutProperty("viirs-nightlight-base", "visibility", "none");
       if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
+      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
+      if (map.current.getLayer("hansen-forest-loss")) map.current.setLayoutProperty("hansen-forest-loss", "visibility", "none");
       void updateNightlightDifferenceLayer(map.current, baseYear, compareYear, showTrends, metric).catch(() => undefined);
+      return;
+    }
+    if (mode === "difference" && metric === "forest") {
+      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
+      if (map.current.getLayer("viirs-nightlight-base")) map.current.setLayoutProperty("viirs-nightlight-base", "visibility", "none");
+      if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
+      if (map.current.getLayer("viirs-nightlight-difference")) map.current.setLayoutProperty("viirs-nightlight-difference", "visibility", "none");
+      void updateForestPeriodLayer(map.current, baseYear, compareYear, showTrends, metric).catch(() => undefined);
+      applyComparisonOpacity(map.current, mode, metric);
+      return;
+    }
+    if (mode === "timeline" && metric === "forest") {
+      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
+      void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
+      applyComparisonOpacity(map.current, mode, metric);
       return;
     }
     if (map.current.getLayer("viirs-nightlight-difference")) map.current.setLayoutProperty("viirs-nightlight-difference", "visibility", "none");
@@ -339,7 +394,7 @@ export default function MapCanvas() {
     void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
     void updateBaseRasterLayer(map.current, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
     void updateBaseRasterLayer(map.current, "forest", baseYear, showTrends, metric).catch(() => undefined);
-    applyComparisonOpacity(map.current, mode);
+    applyComparisonOpacity(map.current, mode, metric);
   }, [baseYear, compareYear, showTrends, metric, mode]);
   useEffect(() => {
     if (!map.current || !focusFacility) return;

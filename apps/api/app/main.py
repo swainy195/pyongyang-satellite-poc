@@ -16,7 +16,7 @@ from supabase import Client, create_client
 from .config import get_settings
 from .schemas import DataAvailability, DataRange, ReportJob, ReportRequest
 from .services.evidence import build_evidence_package
-from .services.hansen import hansen_tile_url
+from .services.hansen import hansen_period_tile_url, hansen_tile_url
 from .services.persisted_stats import load_persisted_stats, stats_to_timeseries
 from .services.viirs import VIIRS_MONTHLY, initialize_earth_engine, viirs_difference_tile, viirs_tile_url
 from .services.hansen import HANSEN_GFC
@@ -166,6 +166,26 @@ def nightlight_tile(year: int) -> dict[str, object]:
     except Exception as error:
         raise HTTPException(status_code=503, detail="Could not create VIIRS tile layer") from error
     return {"year": year, "dataset": "NOAA VIIRS DNB Monthly", "tiles": [tile_url]}
+
+
+@app.get("/api/v1/map/tiles/forest/period")
+def forest_period_tile(
+    start_year: int = Query(..., ge=2001, le=2025),
+    end_year: int = Query(..., ge=2001, le=2025),
+) -> dict[str, object]:
+    try:
+        tile_url = hansen_period_tile_url(start_year, end_year)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Could not create Hansen period tile layer") from error
+    return {
+        "start_year": start_year,
+        "end_year": end_year,
+        "dataset": "Hansen Global Forest Change",
+        "operation": "forest_loss_between_years",
+        "tiles": [tile_url],
+    }
 
 
 @app.get("/api/v1/map/tiles/forest/{year}")

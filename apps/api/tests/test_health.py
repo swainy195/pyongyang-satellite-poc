@@ -36,6 +36,16 @@ def test_nightlight_difference_tile_metadata() -> None:
     assert response.json()["neutral_threshold"] == 0.3
 
 
+def test_forest_period_tile_metadata() -> None:
+    with patch("app.main.hansen_period_tile_url", return_value="https://earthengine.example/{z}/{x}/{y}"):
+        response = client.get("/api/v1/map/tiles/forest/period?start_year=2014&end_year=2024")
+
+    assert response.status_code == 200
+    assert response.json()["operation"] == "forest_loss_between_years"
+    assert response.json()["start_year"] == 2014
+    assert response.json()["end_year"] == 2024
+
+
 def test_database_health_uses_supabase_sdk() -> None:
     supabase = MagicMock()
     supabase.table.return_value.select.return_value.limit.return_value.execute.return_value = MagicMock()
