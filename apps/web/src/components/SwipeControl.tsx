@@ -10,10 +10,17 @@ type SwipeControlProps = {
 
 export default function SwipeControl({ enabled, baseYear, compareYear, positionRef, onPositionChange }: SwipeControlProps) {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const dividerRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<HTMLButtonElement | null>(null);
 
+  const syncPositionVisuals = () => {
+    const left = `${positionRef.current * 100}%`;
+    if (dividerRef.current) dividerRef.current.style.left = left;
+    if (handleRef.current) handleRef.current.style.left = left;
+  };
+
   useEffect(() => {
-    if (handleRef.current) handleRef.current.style.left = `${positionRef.current * 100}%`;
+    syncPositionVisuals();
   }, [enabled, positionRef]);
 
   const updatePosition = (clientX: number) => {
@@ -21,7 +28,7 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
     if (!rail) return;
     const bounds = rail.getBoundingClientRect();
     positionRef.current = Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width));
-    if (handleRef.current) handleRef.current.style.left = `${positionRef.current * 100}%`;
+    syncPositionVisuals();
     onPositionChange();
   };
 
@@ -49,12 +56,13 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   return <div ref={railRef} className={`swipe-control${enabled ? " is-enabled" : ""}`} aria-hidden={!enabled}>
     <div className="swipe-label swipe-label-base"><strong>{baseYear}년</strong><small>과거</small></div>
     <div className="swipe-label swipe-label-compare"><strong>{compareYear}년</strong><small>최근</small></div>
-    <div className="swipe-rail" />
+    <div ref={dividerRef} className="swipe-rail" style={{ left: `${positionRef.current * 100}%` }} />
     {enabled && <span className="swipe-hint">좌우로 움직여 비교</span>}
     <button
       ref={handleRef}
       type="button"
       className="swipe-handle"
+      style={{ left: `${positionRef.current * 100}%` }}
       aria-label={`${baseYear}년 기준과 ${compareYear}년 비교 위치 조절`}
       title="좌우로 드래그하여 비교 위치 조절"
       onPointerDown={handlePointerDown}
