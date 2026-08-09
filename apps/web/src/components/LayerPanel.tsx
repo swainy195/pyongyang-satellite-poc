@@ -114,7 +114,6 @@ export default function LayerPanel() {
       </section>
 
       <section className="control-group display-group" aria-labelledby="display-heading">
-        <div className="section-step">3</div>
         <div className="section-content">
           <h3 id="display-heading">지도 표시</h3>
           <div className="facility-toggle">
