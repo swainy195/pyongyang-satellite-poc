@@ -1,0 +1,24 @@
+[project]
+name = "pyongyang-satellite-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "earthengine-api>=1.5",
+  "geoalchemy2>=0.17",
+  "httpx>=0.28",
+  "jinja2>=3.1",
+  "pydantic-settings>=2.7",
+  "psycopg[binary]>=3.2",
+  "sqlalchemy>=2.0",
+  "supabase>=2.11",
+  "uvicorn[standard]>=0.34",
+  "weasyprint>=63"
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.25", "ruff>=0.9"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

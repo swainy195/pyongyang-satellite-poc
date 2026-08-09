@@ -1,0 +1,8 @@
+{
+  "editor.formatOnSave": true,
+  "files.encoding": "utf8",
+  "python.analysis.extraPaths": [".", "apps/api"],
+  "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" },
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+}

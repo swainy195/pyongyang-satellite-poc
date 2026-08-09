@@ -1,0 +1,19 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.encoding": "utf8",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "typescript.tsdk": "apps/web/node_modules/typescript/lib"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "charliermarsh.ruff",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "supabase.vscode-supabase-extension",
+      "ms-azuretools.vscode-docker"
+    ]
+  }
+}
