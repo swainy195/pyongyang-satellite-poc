@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAnalysisStore, type CompareMode, type Metric } from "../store";
+import { useAnalysisStore, type Metric, type CompareMode } from "../store";
 import { isFacilityIndexLoaded, searchFacilityIndex, type SearchResult } from "../services/facilitySearch";
 
 type SearchPhase = "idle" | "loading" | "searching" | "error";
@@ -14,6 +14,12 @@ const metricOptions: Array<{ value: Metric; title: string; description: string }
   { value: "nightlight", title: "야간 불빛 변화", description: "밤의 밝기 변화를 비교합니다." },
   { value: "forest", title: "산림 변화", description: "산림 감소와 변화 흐름을 확인합니다." },
   { value: "combined", title: "종합 분석", description: "시설 정보와 위성 변화를 함께 봅니다." },
+];
+
+const modeOptions: Array<{ value: CompareMode; title: string; description: string }> = [
+  { value: "difference", title: "변화 한눈에 보기", description: "밝아진 곳과 어두워진 곳을 색으로 확인합니다." },
+  { value: "swipe", title: "과거·최근 직접 비교", description: "가운데 손잡이를 움직여 두 연도의 실제 밝기를 비교합니다." },
+  { value: "timeline", title: "연도별 보기", description: "시간의 흐름에 따라 야간 불빛 변화를 확인합니다." },
 ];
 
 export default function LayerPanel() {
@@ -108,7 +114,15 @@ export default function LayerPanel() {
           <div className="metric-cards" role="group" aria-label="분석 지표 선택">
             {metricOptions.map((option) => <button key={option.value} type="button" className={`metric-card metric-${option.value}${state.metric === option.value ? " is-selected" : ""}`} aria-pressed={state.metric === option.value} onClick={() => state.setMetric(option.value)}>
               <span className="metric-icon" aria-hidden="true">{option.value === "nightlight" ? "◐" : option.value === "forest" ? "⌁" : "◎"}</span><strong>{option.title}</strong><span>{option.description}</span>
-            </button>)}
+              </button>)}
+          </div>
+          <div className="mode-selection">
+            <h4>어떻게 볼까요?</h4>
+            <div className="mode-cards" role="group" aria-label="비교 방식 선택">
+              {modeOptions.map((option) => <button key={option.value} type="button" className={`mode-card mode-${option.value}${state.mode === option.value ? " is-selected" : ""}`} aria-pressed={state.mode === option.value} onClick={() => state.setMode(option.value)}>
+                <strong>{option.title}</strong><span>{option.description}</span>
+              </button>)}
+            </div>
           </div>
         </div>
       </section>
@@ -138,12 +152,6 @@ export default function LayerPanel() {
             <label htmlFor="base-year">기준 연도<input id="base-year" type="number" value={state.baseYear} onChange={(e) => state.setYears(Number(e.target.value), state.compareYear)} /></label>
             <label htmlFor="compare-year">비교 연도<input id="compare-year" type="number" value={state.compareYear} onChange={(e) => state.setYears(state.baseYear, Number(e.target.value))} /></label>
           </div>
-          <label htmlFor="mode-select">비교 방식
-            <select id="mode-select" value={state.mode} onChange={(e) => state.setMode(e.target.value as CompareMode)}>
-              <option value="swipe">좌우로 비교</option><option value="split">좌우 분할</option><option value="difference">변화량</option><option value="timeline">시간 흐름</option>
-            </select>
-          </label>
-          <p className="mode-help">{state.mode === "swipe" ? "과거와 최근의 원본 영상을 직접 비교합니다." : state.mode === "difference" ? "현재는 두 연도 레이어를 겹쳐 보여줍니다. 실제 밝아짐·어두워짐 색상은 차이값 타일 연결이 필요합니다." : state.mode === "timeline" ? "연도별 변화를 시간 흐름으로 확인합니다." : "두 연도를 좌우 영역으로 나누어 비교합니다."}</p>
           <fieldset>
             <legend>지도에 표시할 정보</legend>
             <label><input type="checkbox" checked={state.showBoundaries} onChange={(e) => state.setLayerVisible("boundaries", e.target.checked)} /> 행정경계</label>

@@ -148,7 +148,7 @@ header p { max-width: 760px; }
 .map-caption small { display: block; margin-top: 3px; color: #6b7280; font-size: 10px; }
 .legend-source { color: #9ca3af !important; font-size: 10px !important; }
 .legend-helper { display: block; margin-top: 7px; color: #6b7280; font-size: 10px; line-height: 1.45; }
-.legend-difference .legend-bar { background: linear-gradient(90deg, #cbd5e1, #f3f4f6, #cbd5e1); }
+.legend-difference .legend-bar { background: linear-gradient(90deg, #0891b2, #67e8f9, #e5e7eb, #fdba74, #f59e0b); }
 .mode-help { margin: -4px 0 12px; color: #6b7280; font-size: 10px; line-height: 1.45; }
 .analysis-guide { margin: 9px 0 0; color: #4b5563; font-size: 12px; line-height: 1.5; }
 .analysis-summary { margin-top: 10px; }
@@ -176,6 +176,14 @@ header p { max-width: 760px; }
 .metric-card strong { grid-column: 2; }
 .metric-card > span:not(.metric-icon) { grid-column: 2; }
 .metric-card.is-selected .metric-icon { background: #2563eb; color: white; }
+.mode-selection { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e5e7eb; }
+.mode-selection h4 { margin: 0 0 8px; color: #1f2937; font-size: 13px; }
+.mode-cards { display: grid; gap: 6px; }
+.mode-card { display: grid; gap: 3px; width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; text-align: left; }
+.mode-card strong { font-size: 12px; }
+.mode-card span { color: #6b7280; font-size: 11px; line-height: 1.35; }
+.mode-card.is-selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 1px #2563eb; }
+.mode-card.is-selected strong { color: #1d4ed8; }
 .map-caption, .legend { box-shadow: 0 5px 18px #0f172a18; backdrop-filter: blur(5px); background: #ffffffed; }
 .map-caption { border-radius: 8px; padding: 10px 12px; }
 .legend { border-radius: 8px; padding: 10px 12px; }

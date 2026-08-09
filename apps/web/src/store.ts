@@ -18,7 +18,7 @@ interface AnalysisState {
 }
 export const useAnalysisStore = create<AnalysisState>((set) => ({
   metric: "nightlight",
-  mode: "swipe",
+  mode: "difference",
   baseYear: 2014,
   compareYear: 2024,
   showBoundaries: true,
