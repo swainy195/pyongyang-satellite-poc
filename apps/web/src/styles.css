@@ -33,11 +33,23 @@ fieldset { border: 1px solid #d1d5db; border-radius: 6px; margin: 4px 0 12px; } 
 .analysis-heading strong { display: block; font-size: 18px; line-height: 1.35; }
 .analysis-eyebrow { display: block; color: #6b7280; font-size: 11px; margin-bottom: 3px; }
 .analysis-heading button { flex: 0 0 auto; border: 1px solid #d1d5db; padding: 2px 8px; font-size: 20px; line-height: 1.2; color: #4b5563; }
+.analysis-facility-meta { display: grid; gap: 2px; margin-top: 8px; color: #4b5563; font-size: 11px; line-height: 1.4; }
+.analysis-facility-meta span:first-child { color: #1d4ed8; font-weight: 700; }
+.analysis-facility-meta small { color: #9ca3af; font-size: 10px; }
+.analysis-status { margin: 14px 0 0; color: #4b5563; font-size: 12px; }
+.analysis-status-error { color: #b91c1c; }
 .analysis-summary { margin: 14px 0; line-height: 1.55; font-size: 13px; color: #374151; }
 .analysis-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .analysis-kpis > div { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 10px; font-size: 12px; }
 .analysis-kpis span { display: block; color: #4b5563; line-height: 1.35; }
 .analysis-kpis strong { display: block; font-size: 18px; margin-top: 4px; color: #0f766e; }
+.analysis-kpis small { display: block; margin-top: 4px; color: #6b7280; font-size: 10px; }
+.analysis-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.analysis-detail-card { min-width: 0; padding: 9px 10px; border: 1px solid #e5e7eb; background: #fff; font-size: 11px; }
+.analysis-detail-card strong { display: block; color: #1f2937; font-size: 12px; }
+.analysis-detail-card div { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin-top: 7px; color: #6b7280; }
+.analysis-detail-card b { color: #111827; font-size: 13px; }
+.analysis-detail-card small { display: block; margin-top: 7px; color: #6b7280; font-size: 10px; line-height: 1.4; }
 .analysis-section { border-top: 1px solid #e5e7eb; padding: 10px 0 0; margin-top: 12px; font-size: 12px; line-height: 1.55; }
 .analysis-section p, .analysis-note p { margin: 4px 0 0; }
 .analysis-section-hint { display: block; margin-top: 2px; color: #6b7280; font-size: 10px; }
