@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { useAnalysisStore } from "../store";
 import { apiBaseUrl } from "../api";
+import SwipeControl from "./SwipeControl";
 
 
 function escapeHtml(value: unknown): string {
@@ -117,10 +118,42 @@ function applyComparisonOpacity(map: maplibregl.Map, mode: string) {
   }
 }
 
+function createSwipeClipLayer(
+  id: string,
+  side: "left" | "right" | null,
+  positionRef: { current: number },
+  modeRef: { current: string },
+): maplibregl.CustomLayerInterface {
+  return {
+    id,
+    type: "custom",
+    renderingMode: "2d",
+    render: (gl) => {
+      if (modeRef.current !== "swipe") {
+        gl.disable(gl.SCISSOR_TEST);
+        return;
+      }
+      if (!side) {
+        gl.disable(gl.SCISSOR_TEST);
+        return;
+      }
+      const width = gl.drawingBufferWidth;
+      const height = gl.drawingBufferHeight;
+      const divider = Math.round(width * positionRef.current);
+      gl.enable(gl.SCISSOR_TEST);
+      if (side === "left") gl.scissor(0, 0, divider, height);
+      else gl.scissor(divider, 0, width - divider, height);
+    },
+  };
+}
+
 export default function MapCanvas() {
   const { showBoundaries, showFacilities, showTrends, baseYear, compareYear, metric, mode, focusFacility } = useAnalysisStore();
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const swipePositionRef = useRef(0.5);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   useEffect(() => {
     if (!container.current || map.current) return;
     map.current = new maplibregl.Map({
@@ -144,15 +177,30 @@ export default function MapCanvas() {
     map.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.current.once("load", () => {
-      void updateNightlightLayer(map.current!, compareYear, showTrends, metric).catch(() => undefined);
-      void updateForestLayer(map.current!, compareYear, showTrends, metric).catch(() => undefined);
-      void updateBaseRasterLayer(map.current!, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
-      void updateBaseRasterLayer(map.current!, "forest", baseYear, showTrends, metric).catch(() => undefined);
-      applyComparisonOpacity(map.current!, mode);
-      void Promise.all([
+      const currentMap = map.current!;
+      currentMap.addLayer(createSwipeClipLayer("swipe-base-clip-start", "left", swipePositionRef, modeRef));
+      void (async () => {
+        await Promise.all([
+          updateBaseRasterLayer(currentMap, "nightlight", baseYear, true, "combined"),
+          updateBaseRasterLayer(currentMap, "forest", baseYear, true, "combined"),
+        ]);
+        currentMap.addLayer(createSwipeClipLayer("swipe-base-clip-end", null, swipePositionRef, modeRef));
+        currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-start", "right", swipePositionRef, modeRef));
+        await Promise.all([
+          updateNightlightLayer(currentMap, compareYear, true, "combined"),
+          updateForestLayer(currentMap, compareYear, true, "combined"),
+        ]);
+        currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-end", null, swipePositionRef, modeRef));
+        void updateNightlightLayer(currentMap, compareYear, showTrends, metric).catch(() => undefined);
+        void updateForestLayer(currentMap, compareYear, showTrends, metric).catch(() => undefined);
+        void updateBaseRasterLayer(currentMap, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
+        void updateBaseRasterLayer(currentMap, "forest", baseYear, showTrends, metric).catch(() => undefined);
+        applyComparisonOpacity(currentMap, mode);
+        return Promise.all([
         fetch(`${apiBaseUrl}/api/v1/admin-boundaries`).then((response) => response.ok ? response.json() : ({ type: "FeatureCollection", features: [] })),
         fetch(`${apiBaseUrl}/api/v1/facilities`).then((response) => response.ok ? response.json() : ({ items: [] })),
-      ]).then(([boundaries, facilities]) => {
+        ]);
+      })().then(([boundaries, facilities]) => {
         const currentMap = map.current;
         if (!currentMap) return;
 
@@ -257,5 +305,8 @@ export default function MapCanvas() {
       currentMap.setLayoutProperty("facilities-points", "visibility", showFacilities ? "visible" : "none");
     }
   }, [showBoundaries, showFacilities]);
-  return <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />;
+  return <>
+    <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
+    <SwipeControl enabled={mode === "swipe"} baseYear={baseYear} compareYear={compareYear} positionRef={swipePositionRef} onPositionChange={() => map.current?.triggerRepaint()} />
+  </>;
 }
