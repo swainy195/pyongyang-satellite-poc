@@ -28,7 +28,7 @@ export default function AnalysisPanel() {
     {analysis && <>
       <div className="analysis-overview"><strong>한눈에 보기</strong><p>{analysis.summary}</p></div>
       <div className="analysis-kpis" aria-label="핵심 분석 지표">
-        <div><span>야간조도 관측값 변화</span><strong>{analysis.nightlightChangePct == null ? "-" : `${analysis.nightlightChangePct > 0 ? "+" : ""}${analysis.nightlightChangePct}%`}</strong></div>
+        <div><span>야간 불빛 관측값 변화</span><strong>{analysis.nightlightChangePct == null ? "-" : `${analysis.nightlightChangePct > 0 ? "+" : ""}${analysis.nightlightChangePct}%`}</strong></div>
         <div><span>산림손실</span><strong>{analysis.forestLossKm2 == null ? "-" : `${analysis.forestLossKm2} km²`}</strong></div>
       </div>
       <div className="analysis-section analysis-observation"><strong>관찰</strong><span className="analysis-section-hint">데이터에서 직접 확인된 내용</span><p>{analysis.observation}</p></div>
@@ -36,8 +36,8 @@ export default function AnalysisPanel() {
       <div className="analysis-note"><strong>주의</strong><p>위성자료만으로 시설 운영 원인이나 정책적 결론을 단정하지 않습니다. 관련 자료와 함께 참고해주세요.</p></div>
       <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis.confidence}</span><span>{analysis.sources.join(" · ")}</span></div></div>
       <div className="analysis-chart-wrap">
-        <strong className="analysis-chart-title">VIIRS 야간조도 연도별 변화</strong>
-        <div className="analysis-chart" role="img" aria-label="VIIRS 야간조도 연도별 변화 그래프">{points.map((point) => <div className="analysis-bar" key={point.year} title={`${point.year}년 · Radiance: ${point.mean_radiance ?? "-"}`} aria-label={`${point.year}년, Radiance ${point.mean_radiance ?? "-"}`}><i style={{ height: `${Math.max(3, Number(point.mean_radiance ?? 0) / max * 100)}%` }} /><small>{point.year}</small></div>)}</div>
+        <strong className="analysis-chart-title">야간 불빛 연도별 변화</strong>
+        <div className="analysis-chart" role="img" aria-label="야간 불빛 연도별 변화 그래프">{points.map((point) => <div className="analysis-bar" key={point.year} title={`${point.year}년 · Radiance: ${point.mean_radiance ?? "-"}`} aria-label={`${point.year}년, Radiance ${point.mean_radiance ?? "-"}`}><i style={{ height: `${Math.max(3, Number(point.mean_radiance ?? 0) / max * 100)}%` }} /><small>{point.year}</small></div>)}</div>
       </div>
     </>}
   </aside>;

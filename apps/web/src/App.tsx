@@ -54,8 +54,8 @@ export default function App() {
       <section className="map-area">
         <MapCanvas />
         <AnalysisPanel />
-        <div className="map-caption"><strong>{metricLabels[state.metric]}</strong><span>{state.baseYear}년 → {state.compareYear}년 · {modeLabels[state.mode]}</span>{state.mode === "swipe" && <small>가운데 손잡이를 좌우로 움직여 비교해보세요.</small>}</div>
-        <div className="legend"><strong>{state.metric === "nightlight" ? "야간 불빛 변화" : state.metric === "forest" ? "산림 변화" : "위성 변화 종합"}</strong><span className="legend-source">{state.metric === "nightlight" ? "NOAA VIIRS DNB" : state.metric === "forest" ? "Hansen Global Forest Change" : "VIIRS · Hansen"}</span><div className="legend-bar" /><span>낮음 <em>{state.metric === "nightlight" ? "밝기" : "변화량"}</em> 높음</span></div>
+        <div className="map-caption"><strong>{metricLabels[state.metric]}</strong><span>{state.mode === "swipe" ? `${state.baseYear}년 과거 ↔ ${state.compareYear}년 최근` : `${state.baseYear}년 기준 → ${state.compareYear}년`}</span>{state.mode === "swipe" && <small>좌우로 움직여 밝기 변화를 비교해보세요.</small>}</div>
+        <div className="legend"><strong>{state.metric === "nightlight" && state.mode === "difference" ? "야간 불빛 변화량" : state.metric === "nightlight" ? "야간 불빛 밝기" : state.metric === "forest" ? "산림 변화" : "위성 변화 종합"}</strong><span className="legend-source">{state.metric === "nightlight" ? "NOAA VIIRS DNB" : state.metric === "forest" ? "Hansen Global Forest Change" : "VIIRS · Hansen"}</span><div className="legend-bar" /><span>{state.metric === "nightlight" && state.mode === "difference" ? "감소" : state.metric === "nightlight" ? "어두움" : "낮음"} <em>{state.metric === "nightlight" && state.mode === "difference" ? "변화 적음" : state.metric === "nightlight" ? "밝기" : "변화량"}</em> {state.metric === "nightlight" && state.mode === "difference" ? "증가" : state.metric === "nightlight" ? "밝음" : "높음"}</span><small className="legend-helper">● 주요 시설 위치<br />지도 색상은 위성 관측값을 나타냅니다.</small></div>
       </section>
       <footer>
         <button type="button" onClick={() => changeYear(-1)} title="이전 연도">이전</button>
