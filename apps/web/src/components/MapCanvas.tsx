@@ -247,8 +247,8 @@ export default function MapCanvas() {
         if (!map.current) return;
         if (currentMap.getSource("facilities")) return;
         currentMap.addSource("facilities", { type: "geojson", data: facilities });
-        currentMap.addLayer({ id: "facilities-points", type: "circle", source: "facilities", paint: { "circle-color": "#2563eb", "circle-radius": 4, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 } });
-        currentMap.addLayer({ id: "facilities-selected", type: "circle", source: "facilities", filter: ["==", ["get", "id"], -1], paint: { "circle-color": "#ffffff", "circle-radius": 8, "circle-stroke-color": "#dc2626", "circle-stroke-width": 2 } });
+        currentMap.addLayer({ id: "facilities-points", type: "circle", source: "facilities", paint: { "circle-color": "#2563eb", "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.5, 8, 0.6, 11, 0.82], "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2, 8, 3, 11, 5], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 } });
+        currentMap.addLayer({ id: "facilities-selected", type: "circle", source: "facilities", filter: ["==", ["get", "id"], -1], paint: { "circle-color": "#ffffff", "circle-opacity": 0.95, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5, 8, 7, 11, 10], "circle-stroke-color": "#dc2626", "circle-stroke-width": 2.5 } });
         currentMap.on("mouseenter", "facilities-points", () => { currentMap.getCanvas().style.cursor = "pointer"; });
         currentMap.on("mouseleave", "facilities-points", () => { currentMap.getCanvas().style.cursor = ""; });
         currentMap.on("click", "facilities-points", async (event) => {

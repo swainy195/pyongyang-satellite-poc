@@ -26,7 +26,7 @@ export default function AnalysisPanel() {
     <p className="analysis-guide">이 시설 주변의 위성 변화와 시간 흐름을 확인해보세요.</p>
     {status && <p>{status}</p>}
     {analysis && <>
-      <p className="analysis-summary">{analysis.summary}</p>
+      <div className="analysis-overview"><strong>한눈에 보기</strong><p>{analysis.summary}</p></div>
       <div className="analysis-kpis" aria-label="핵심 분석 지표">
         <div><span>야간조도 관측값 변화</span><strong>{analysis.nightlightChangePct == null ? "-" : `${analysis.nightlightChangePct > 0 ? "+" : ""}${analysis.nightlightChangePct}%`}</strong></div>
         <div><span>산림손실</span><strong>{analysis.forestLossKm2 == null ? "-" : `${analysis.forestLossKm2} km²`}</strong></div>

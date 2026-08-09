@@ -63,6 +63,9 @@ export default function LayerPanel() {
         <span className="panel-kicker">위성정보 탐색</span>
         <h2>어디를 살펴볼까요?</h2>
         <p>시설을 선택하면 과거와 최근의 변화를 지도와 분석 결과로 확인할 수 있습니다.</p>
+        <div className="journey-steps" aria-label="서비스 이용 순서">
+          <span><b>1</b> 시설 선택</span><i aria-hidden="true">→</i><span><b>2</b> 변화 비교</span><i aria-hidden="true">→</i><span><b>3</b> 결과 확인</span>
+        </div>
       </div>
 
       <section className="control-group target-group" aria-labelledby="target-heading">
@@ -91,7 +94,7 @@ export default function LayerPanel() {
             <div className="subsection-heading"><strong>추천 시설</strong><span>바로 분석해보기</span></div>
             <div className="recommended-list">
               {recommendedFacilities.map((facility) => <button key={facility.id} type="button" className="recommended-card" onClick={() => state.setFocusFacility(facility)}>
-                <strong>{facility.name}</strong><small>{facility.category}</small><span>변화 확인 →</span>
+                <span className="recommended-badge">추천</span><strong>{facility.name}</strong><small>{facility.category}</small><span className="recommended-action">변화 확인 →</span>
               </button>)}
             </div>
           </div>
@@ -103,8 +106,8 @@ export default function LayerPanel() {
         <div className="section-content">
           <h3 id="metric-heading">무엇을 비교할까요?</h3>
           <div className="metric-cards" role="group" aria-label="분석 지표 선택">
-            {metricOptions.map((option) => <button key={option.value} type="button" className={`metric-card${state.metric === option.value ? " is-selected" : ""}`} aria-pressed={state.metric === option.value} onClick={() => state.setMetric(option.value)}>
-              <strong>{option.title}</strong><span>{option.description}</span>
+            {metricOptions.map((option) => <button key={option.value} type="button" className={`metric-card metric-${option.value}${state.metric === option.value ? " is-selected" : ""}`} aria-pressed={state.metric === option.value} onClick={() => state.setMetric(option.value)}>
+              <span className="metric-icon" aria-hidden="true">{option.value === "nightlight" ? "◐" : option.value === "forest" ? "⌁" : "◎"}</span><strong>{option.title}</strong><span>{option.description}</span>
             </button>)}
           </div>
         </div>

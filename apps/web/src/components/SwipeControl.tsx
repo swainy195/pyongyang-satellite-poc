@@ -50,6 +50,7 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
     <div className="swipe-label swipe-label-base"><strong>{baseYear}년</strong><small>과거</small></div>
     <div className="swipe-label swipe-label-compare"><strong>{compareYear}년</strong><small>최근</small></div>
     <div className="swipe-rail" />
+    {enabled && <span className="swipe-hint">좌우로 움직여 비교</span>}
     <button
       ref={handleRef}
       type="button"
