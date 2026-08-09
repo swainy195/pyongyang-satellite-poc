@@ -370,8 +370,8 @@ export default function MapCanvas() {
     {satelliteStatus !== "ready" && (
       <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
         {satelliteStatus === "loading"
-          ? "위성 분석 레이어를 준비하고 있습니다..."
-          : "위성 분석 레이어를 불러오지 못했습니다. 잠시 후 다시 시도해주세요."}
+          ? "위성 레이어 준비 중..."
+          : "위성 레이어를 불러오지 못했습니다."}
       </div>
     )}
     <SwipeControl enabled={mode === "swipe"} baseYear={baseYear} compareYear={compareYear} positionRef={swipePositionRef} onPositionChange={() => map.current?.triggerRepaint()} />
