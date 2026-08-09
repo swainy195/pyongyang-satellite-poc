@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAnalysisStore } from "../store";
 import { apiBaseUrl } from "../api";
 
@@ -88,8 +88,10 @@ export default function AnalysisPanel() {
   const [trends, setTrends] = useState<RelatedTrend[]>([]);
   const [trendsStatus, setTrendsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
   const [showAllTrends, setShowAllTrends] = useState(false);
+  const analysisRequestId = useRef(0);
 
   useEffect(() => {
+    const requestId = ++analysisRequestId.current;
     if (!focus) {
       setFacility(null);
       setAnalysis(null);
@@ -102,7 +104,10 @@ export default function AnalysisPanel() {
       return;
     }
 
-    const controller = new AbortController();
+    const detailController = new AbortController();
+    const statsController = new AbortController();
+    const timeseriesController = new AbortController();
+    const analysisController = new AbortController();
     setFacility({ name: focus.name, category: focus.category, address: focus.address, longitude: focus.longitude, latitude: focus.latitude });
     setAnalysis(null);
     setDetailStatus("loading");
@@ -113,6 +118,7 @@ export default function AnalysisPanel() {
     const handleResponse = async <T,>(
       label: string,
       request: Promise<Response>,
+      controller: AbortController,
       onSuccess: (value: T) => void,
       onStatus: (status: "ready" | "empty" | "error") => void,
     ) => {
@@ -126,7 +132,7 @@ export default function AnalysisPanel() {
         onSuccess(await response.json() as T);
         onStatus("ready");
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || analysisRequestId.current !== requestId) return;
         console.error(`${label} request failed:`, error);
         onStatus("error");
       }
@@ -134,30 +140,39 @@ export default function AnalysisPanel() {
 
     void handleResponse<{ facility: FacilityDetail }>(
       "Facility detail",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: detailController.signal }),
+      detailController,
       (value) => setFacility(value.facility),
       (value) => setDetailStatus(value === "empty" ? "error" : value),
     );
     void handleResponse<Stats>(
       "Facility stats",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=2012&end_year=2025`, { signal: statsController.signal }),
+      statsController,
       setStats,
       (value) => setStatsStatus(value),
     );
     void handleResponse<Timeseries>(
       "Facility timeseries",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=2012&end_year=2025`, { signal: timeseriesController.signal }),
+      timeseriesController,
       setTimeseries,
       (value) => setTimeseriesStatus(value),
     );
     void handleResponse<Analysis>(
       "Facility analysis",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: analysisController.signal }),
+      analysisController,
       setAnalysis,
       (value) => setAnalysisStatus(value),
     );
 
-    return () => controller.abort();
+    return () => {
+      detailController.abort();
+      statsController.abort();
+      timeseriesController.abort();
+      analysisController.abort();
+    };
   }, [focus]);
 
   useEffect(() => {
