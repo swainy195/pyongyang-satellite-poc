@@ -19,12 +19,14 @@ export default function LayerPanel() {
     setSearching(true);
     setSearchError(false);
     try {
-      const searchPath = import.meta.env.PROD ? "/api/facilities" : `${apiBaseUrl}/api/v1/facilities`;
-      const response = await fetch(`${searchPath}?q=${encodeURIComponent(trimmed)}&limit=20`);
+      const response = await fetch(
+        `${apiBaseUrl}/api/v1/facilities?q=${encodeURIComponent(trimmed)}&limit=20`,
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json() as { items: SearchResult[] };
       setResults(payload.items ?? []);
-    } catch {
+    } catch (error) {
+      console.error("Facility search failed", error);
       setResults([]);
       setSearchError(true);
     } finally {
