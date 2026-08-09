@@ -9,7 +9,7 @@ interface AnalysisState {
   showBoundaries: boolean;
   showFacilities: boolean;
   showTrends: boolean;
-  focusFacility: { id: number; name: string; longitude: number; latitude: number } | null;
+  focusFacility: { id: number; name: string; category?: string; address?: string; longitude: number; latitude: number } | null;
   setMetric: (metric: Metric) => void;
   setMode: (mode: CompareMode) => void;
   setYears: (baseYear: number, compareYear: number) => void;

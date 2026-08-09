@@ -72,27 +72,43 @@ export default function AnalysisPanel() {
     }
 
     const controller = new AbortController();
-    setFacility({ name: focus.name });
+    setFacility({ name: focus.name, category: focus.category, address: focus.address, longitude: focus.longitude, latitude: focus.latitude });
     setAnalysis(null);
     setStatus("loading");
 
-    Promise.all([
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: controller.signal }),
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: controller.signal }),
-    ]).then(async ([facilityResponse, analysisResponse]) => {
-      if (!facilityResponse.ok) throw new Error("facility detail request failed");
-      const detail = await facilityResponse.json() as { facility: FacilityDetail };
-      setFacility(detail.facility);
-      if (analysisResponse.status === 422) {
+    const detailRequest = fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: controller.signal });
+    const analysisRequest = fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: controller.signal });
+    Promise.allSettled([detailRequest, analysisRequest]).then(async ([detailResult, analysisResult]) => {
+      if (controller.signal.aborted) return;
+
+      if (detailResult.status === "fulfilled" && detailResult.value.ok) {
+        try {
+          const detail = await detailResult.value.json() as { facility: FacilityDetail };
+          setFacility(detail.facility);
+        } catch (error) {
+          console.error("Facility detail response parsing failed:", error);
+        }
+      } else {
+        console.error("Facility detail request failed:", detailResult.status === "fulfilled" ? detailResult.value.status : detailResult.reason);
+      }
+
+      if (analysisResult.status === "fulfilled" && analysisResult.value.status === 422) {
         setStatus("empty");
         return;
       }
-      if (!analysisResponse.ok) throw new Error("facility analysis request failed");
-      setAnalysis(await analysisResponse.json() as Analysis);
-      setStatus("ready");
-    }).catch((error: unknown) => {
-      if (controller.signal.aborted) return;
-      console.error("Facility analysis failed:", error);
+      if (analysisResult.status === "fulfilled" && analysisResult.value.ok) {
+        try {
+          setAnalysis(await analysisResult.value.json() as Analysis);
+          setStatus("ready");
+          return;
+        } catch (error) {
+          console.error("Facility analysis response parsing failed:", error);
+        }
+      } else {
+        console.error("Facility analysis request failed:", analysisResult.status === "fulfilled" ? analysisResult.value.status : analysisResult.reason);
+      }
+
+      // Keep any successfully loaded facility metadata visible when only statistics fail.
       setStatus("error");
     });
 
@@ -101,8 +117,10 @@ export default function AnalysisPanel() {
 
   const nightlightPoints = analysis?.series.nightlight ?? [];
   const forestPoints = analysis?.series.forest ?? [];
-  const firstNightlight = nightlightPoints[0]?.mean_radiance;
-  const lastNightlight = nightlightPoints[nightlightPoints.length - 1]?.mean_radiance;
+  const firstNightlightPoint = nightlightPoints.find((point) => point.mean_radiance != null);
+  const lastNightlightPoint = [...nightlightPoints].reverse().find((point) => point.mean_radiance != null);
+  const firstNightlight = firstNightlightPoint?.mean_radiance;
+  const lastNightlight = lastNightlightPoint?.mean_radiance;
   const nightlightDelta = firstNightlight != null && lastNightlight != null ? lastNightlight - firstNightlight : null;
   const cumulativeForestLoss = forestPoints.length > 0 ? forestPoints[forestPoints.length - 1].cumulative_loss_km2 : null;
   const period = analysis?.period ?? { start: 2012, end: 2025 };
@@ -132,7 +150,7 @@ export default function AnalysisPanel() {
       </div>
 
       <div className="analysis-detail-grid">
-        <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
+        <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
         <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatValue(analysis.forestLossKm2, 3)} km²</b></div><small>누적 손실 {formatValue(cumulativeForestLoss, 3)} km²</small></section>
       </div>
 
