@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     gee_project_id: str = ""
     gee_service_account: str = ""
     google_application_credentials: str = ""
+    google_application_credentials_json: str = ""
     report_llm_provider: str = ""
     report_llm_model: str = ""
     report_llm_api_key: str = ""

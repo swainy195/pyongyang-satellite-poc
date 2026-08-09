@@ -1,4 +1,5 @@
 from functools import lru_cache
+import tempfile
 from pathlib import Path
 
 import ee
@@ -11,6 +12,11 @@ PALETTE = ["#111827", "#312e81", "#7e22ce", "#f97316", "#fde047"]
 
 def _credentials_path() -> str | None:
     settings = get_settings()
+    if settings.google_application_credentials_json:
+        path = Path(tempfile.gettempdir()) / "pyongyang-gee-service-account.json"
+        if not path.exists():
+            path.write_text(settings.google_application_credentials_json, encoding="utf-8")
+        return str(path)
     configured = Path(settings.google_application_credentials) if settings.google_application_credentials else None
     if configured and configured.exists():
         return str(configured)
