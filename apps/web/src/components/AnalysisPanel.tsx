@@ -15,6 +15,8 @@ type Analysis = {
   forestLossKm2: number | null;
   series: { nightlight: NightlightPoint[]; forest: ForestPoint[] };
 };
+type Stats = { nightlight: NightlightPoint[]; forest: ForestPoint[] };
+type Timeseries = { series: Array<{ year: number; nightlight?: number | null; forestLossKm2?: number | null }> };
 type FacilityDetail = {
   name: string;
   category?: string | null;
@@ -61,71 +63,97 @@ export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
   const [facility, setFacility] = useState<FacilityDetail | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [timeseries, setTimeseries] = useState<Timeseries | null>(null);
+  const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [statsStatus, setStatsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [timeseriesStatus, setTimeseriesStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
 
   useEffect(() => {
     if (!focus) {
       setFacility(null);
       setAnalysis(null);
-      setStatus("idle");
+      setStats(null);
+      setTimeseries(null);
+      setDetailStatus("idle");
+      setStatsStatus("idle");
+      setTimeseriesStatus("idle");
+      setAnalysisStatus("idle");
       return;
     }
 
     const controller = new AbortController();
     setFacility({ name: focus.name, category: focus.category, address: focus.address, longitude: focus.longitude, latitude: focus.latitude });
     setAnalysis(null);
-    setStatus("loading");
+    setDetailStatus("loading");
+    setStatsStatus("loading");
+    setTimeseriesStatus("loading");
+    setAnalysisStatus("loading");
 
-    const detailRequest = fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: controller.signal });
-    const analysisRequest = fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: controller.signal });
-    Promise.allSettled([detailRequest, analysisRequest]).then(async ([detailResult, analysisResult]) => {
-      if (controller.signal.aborted) return;
-
-      if (detailResult.status === "fulfilled" && detailResult.value.ok) {
-        try {
-          const detail = await detailResult.value.json() as { facility: FacilityDetail };
-          setFacility(detail.facility);
-        } catch (error) {
-          console.error("Facility detail response parsing failed:", error);
-        }
-      } else {
-        console.error("Facility detail request failed:", detailResult.status === "fulfilled" ? detailResult.value.status : detailResult.reason);
-      }
-
-      if (analysisResult.status === "fulfilled" && analysisResult.value.status === 422) {
-        setStatus("empty");
-        return;
-      }
-      if (analysisResult.status === "fulfilled" && analysisResult.value.ok) {
-        try {
-          setAnalysis(await analysisResult.value.json() as Analysis);
-          setStatus("ready");
+    const handleResponse = async <T,>(
+      label: string,
+      request: Promise<Response>,
+      onSuccess: (value: T) => void,
+      onStatus: (status: "ready" | "empty" | "error") => void,
+    ) => {
+      try {
+        const response = await request;
+        if (response.status === 422) {
+          onStatus("empty");
           return;
-        } catch (error) {
-          console.error("Facility analysis response parsing failed:", error);
         }
-      } else {
-        console.error("Facility analysis request failed:", analysisResult.status === "fulfilled" ? analysisResult.value.status : analysisResult.reason);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        onSuccess(await response.json() as T);
+        onStatus("ready");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error(`${label} request failed:`, error);
+        onStatus("error");
       }
+    };
 
-      // Keep any successfully loaded facility metadata visible when only statistics fail.
-      setStatus("error");
-    });
+    void handleResponse<{ facility: FacilityDetail }>(
+      "Facility detail",
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: controller.signal }),
+      (value) => setFacility(value.facility),
+      (value) => setDetailStatus(value === "empty" ? "error" : value),
+    );
+    void handleResponse<Stats>(
+      "Facility stats",
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      setStats,
+      (value) => setStatsStatus(value),
+    );
+    void handleResponse<Timeseries>(
+      "Facility timeseries",
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      setTimeseries,
+      (value) => setTimeseriesStatus(value),
+    );
+    void handleResponse<Analysis>(
+      "Facility analysis",
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: controller.signal }),
+      setAnalysis,
+      (value) => setAnalysisStatus(value),
+    );
 
     return () => controller.abort();
   }, [focus]);
 
-  const nightlightPoints = analysis?.series.nightlight ?? [];
-  const forestPoints = analysis?.series.forest ?? [];
+  const nightlightPoints: NightlightPoint[] = stats?.nightlight ?? analysis?.series.nightlight ?? timeseries?.series.map((point) => ({ year: point.year, mean_radiance: point.nightlight })) ?? [];
+  const forestPoints: ForestPoint[] = stats?.forest ?? analysis?.series.forest ?? timeseries?.series.map((point) => ({ year: point.year, annual_loss_km2: point.forestLossKm2, cumulative_loss_km2: null })) ?? [];
   const firstNightlightPoint = nightlightPoints.find((point) => point.mean_radiance != null);
   const lastNightlightPoint = [...nightlightPoints].reverse().find((point) => point.mean_radiance != null);
   const firstNightlight = firstNightlightPoint?.mean_radiance;
   const lastNightlight = lastNightlightPoint?.mean_radiance;
   const nightlightDelta = firstNightlight != null && lastNightlight != null ? lastNightlight - firstNightlight : null;
   const cumulativeForestLoss = forestPoints.length > 0 ? forestPoints[forestPoints.length - 1].cumulative_loss_km2 : null;
+  const nightlightChangePct = firstNightlight != null && firstNightlight !== 0 && lastNightlight != null ? (lastNightlight - firstNightlight) / firstNightlight * 100 : analysis?.nightlightChangePct ?? null;
+  const forestLossTotal = stats?.forest.reduce((total, point) => total + Number(point.annual_loss_km2 ?? 0), 0) ?? analysis?.forestLossKm2 ?? null;
   const period = analysis?.period ?? { start: 2012, end: 2025 };
 
-  if (!focus || status === "idle") return null;
+  if (!focus) return null;
   return <aside className="analysis-panel" aria-live="polite">
     <div className="analysis-heading">
       <div><span className="analysis-eyebrow">선택 시설 분석</span><strong>{facility?.name ?? focus.name}</strong></div>
@@ -138,30 +166,36 @@ export default function AnalysisPanel() {
     </div>}
     <p className="analysis-guide">이 시설 주변에서 관측된 야간 불빛과 산림 변화를 확인해보세요.</p>
 
-    {status === "loading" && <p className="analysis-status" role="status">시설 분석 정보를 불러오는 중...</p>}
-    {status === "error" && <p className="analysis-status analysis-status-error" role="alert">시설 분석 정보를 불러오지 못했습니다.</p>}
-    {status === "empty" && <p className="analysis-status" role="status">이 시설의 위성 통계가 아직 준비되지 않았습니다.</p>}
+    {detailStatus === "loading" && <p className="analysis-status" role="status">시설 기본정보를 불러오는 중...</p>}
+    {detailStatus === "error" && <p className="analysis-status analysis-status-error" role="alert">시설 기본정보를 불러오지 못했습니다.</p>}
 
-    {analysis && <>
-      <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>
+    {(statsStatus === "loading" || statsStatus === "error" || statsStatus === "empty") && <p className={`analysis-status${statsStatus === "error" ? " analysis-status-error" : ""}`} role={statsStatus === "error" ? "alert" : "status"}>{statsStatus === "loading" ? "통계 정보를 불러오는 중..." : statsStatus === "empty" ? "이 시설의 위성 통계가 아직 준비되지 않았습니다." : "통계 정보를 불러오지 못했습니다."}</p>}
+    {(analysis || stats || timeseries) && <>
+      {analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
       <div className="analysis-kpis" aria-label="핵심 분석 지표">
-        <div><span>야간 불빛 변화</span><strong>{formatPercent(analysis.nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>
-        <div><span>산림손실</span><strong>{formatValue(analysis.forestLossKm2, 3)} km²</strong><small>{period.start} → {period.end}년 누적</small></div>
+        <div><span>야간 불빛 변화</span><strong>{formatPercent(nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>
+        <div><span>산림손실</span><strong>{formatValue(forestLossTotal, 3)} km²</strong><small>{period.start} → {period.end}년 누적</small></div>
       </div>
 
       <div className="analysis-detail-grid">
         <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
-        <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatValue(analysis.forestLossKm2, 3)} km²</b></div><small>누적 손실 {formatValue(cumulativeForestLoss, 3)} km²</small></section>
+        <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatValue(forestLossTotal, 3)} km²</b></div><small>누적 손실 {formatValue(cumulativeForestLoss, 3)} km²</small></section>
       </div>
 
-      <div className="analysis-section analysis-observation"><strong>관찰</strong><span className="analysis-section-hint">데이터에서 직접 확인된 내용</span><p>{analysis.observation}</p></div>
-      <div className="analysis-section analysis-interpretation"><strong>해석</strong><span className="analysis-section-hint">관찰 결과를 바탕으로 한 참고 의견</span><p>{analysis.interpretation}</p></div>
+      {analysis && <>
+        <div className="analysis-section analysis-observation"><strong>관찰</strong><span className="analysis-section-hint">데이터에서 직접 확인된 내용</span><p>{analysis.observation}</p></div>
+        <div className="analysis-section analysis-interpretation"><strong>해석</strong><span className="analysis-section-hint">관찰 결과를 바탕으로 한 참고 의견</span><p>{analysis.interpretation}</p></div>
+      </>}
       <div className="analysis-note"><strong>주의</strong><p>단일 위성지표만으로 시설 운영 여부나 변화 원인을 확정할 수 없습니다. 관련 자료와 함께 참고해주세요.</p></div>
 
-      <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />
-      <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" />
+      {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
+        <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />
+        <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" />
+      </>}
 
-      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis.confidence}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change</span></div></div>
+      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change</span></div></div>
     </>}
+    {analysisStatus === "error" && <div className="analysis-section analysis-status-error" role="alert"><strong>관찰·해석</strong><p>분석 문장을 불러오지 못했습니다. 위의 통계와 시계열을 기준으로 확인해주세요.</p></div>}
+    {analysisStatus === "empty" && <div className="analysis-section" role="status"><strong>관찰·해석</strong><p>이 시설의 분석 문장이 아직 준비되지 않았습니다.</p></div>}
   </aside>;
 }
