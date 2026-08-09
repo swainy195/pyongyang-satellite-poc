@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { useAnalysisStore } from "../store";
 import { apiBaseUrl } from "../api";
@@ -29,7 +29,7 @@ async function updateNightlightLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/nightlight/${year}`);
-  if (!response.ok) return;
+  if (!response.ok) throw new Error(`VIIRS tile metadata HTTP ${response.status}`);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "viirs-nightlight-source";
   const source = map.getSource(sourceId);
@@ -42,7 +42,7 @@ async function updateNightlightLayer(
       type: "raster",
       source: sourceId,
       paint: { "raster-opacity": 0.62 },
-    });
+    }, map.getLayer("swipe-compare-clip-end") ? "swipe-compare-clip-end" : undefined);
   }
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
@@ -61,7 +61,7 @@ async function updateForestLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/forest/${year}`);
-  if (!response.ok) return;
+  if (!response.ok) throw new Error(`Hansen tile metadata HTTP ${response.status}`);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "hansen-forest-source";
   const source = map.getSource(sourceId);
@@ -74,7 +74,7 @@ async function updateForestLayer(
       type: "raster",
       source: sourceId,
       paint: { "raster-opacity": 0.58 },
-    });
+    }, map.getLayer("swipe-compare-clip-end") ? "swipe-compare-clip-end" : undefined);
   }
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
@@ -95,14 +95,17 @@ async function updateBaseRasterLayer(
     return;
   }
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/${isNightlight ? "nightlight" : "forest"}/${year}`);
-  if (!response.ok) return;
+  if (!response.ok) throw new Error(`${type} tile metadata HTTP ${response.status}`);
   const payload = await response.json() as { tiles: string[] };
   const source = map.getSource(sourceId);
   if (source && "setTiles" in source) {
     (source as maplibregl.RasterTileSource).setTiles(payload.tiles);
   } else if (!source) {
     map.addSource(sourceId, { type: "raster", tiles: payload.tiles, tileSize: 256 });
-    map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.42 } });
+    map.addLayer(
+      { id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.42 } },
+      map.getLayer("swipe-base-clip-end") ? "swipe-base-clip-end" : undefined,
+    );
   }
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
@@ -147,10 +150,55 @@ function createSwipeClipLayer(
   };
 }
 
+async function waitForBackend() {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 45_000);
+    try {
+      const response = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Backend health HTTP ${response.status}`);
+      return;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function prepareSatelliteLayers(
+  map: maplibregl.Map,
+  baseYear: number,
+  compareYear: number,
+  showTrends: boolean,
+  metric: string,
+  mode: string,
+) {
+  await waitForBackend();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await Promise.all([
+        updateBaseRasterLayer(map, "nightlight", baseYear, showTrends, metric),
+        updateBaseRasterLayer(map, "forest", baseYear, showTrends, metric),
+        updateNightlightLayer(map, compareYear, showTrends, metric),
+        updateForestLayer(map, compareYear, showTrends, metric),
+      ]);
+      applyComparisonOpacity(map, mode);
+      return;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+    }
+  }
+}
+
 export default function MapCanvas() {
   const { showBoundaries, showFacilities, showTrends, baseYear, compareYear, metric, mode, focusFacility } = useAnalysisStore();
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const satelliteInitializedRef = useRef(false);
+  const [satelliteStatus, setSatelliteStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const swipePositionRef = useRef(0.5);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -179,111 +227,59 @@ export default function MapCanvas() {
     map.current.once("load", () => {
       const currentMap = map.current!;
       currentMap.addLayer(createSwipeClipLayer("swipe-base-clip-start", "left", swipePositionRef, modeRef));
-      void (async () => {
-        await Promise.all([
-          updateBaseRasterLayer(currentMap, "nightlight", baseYear, true, "combined"),
-          updateBaseRasterLayer(currentMap, "forest", baseYear, true, "combined"),
-        ]);
-        currentMap.addLayer(createSwipeClipLayer("swipe-base-clip-end", null, swipePositionRef, modeRef));
-        currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-start", "right", swipePositionRef, modeRef));
-        await Promise.all([
-          updateNightlightLayer(currentMap, compareYear, true, "combined"),
-          updateForestLayer(currentMap, compareYear, true, "combined"),
-        ]);
-        currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-end", null, swipePositionRef, modeRef));
-        void updateNightlightLayer(currentMap, compareYear, showTrends, metric).catch(() => undefined);
-        void updateForestLayer(currentMap, compareYear, showTrends, metric).catch(() => undefined);
-        void updateBaseRasterLayer(currentMap, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
-        void updateBaseRasterLayer(currentMap, "forest", baseYear, showTrends, metric).catch(() => undefined);
-        applyComparisonOpacity(currentMap, mode);
-        return Promise.all([
-        fetch(`${apiBaseUrl}/api/v1/admin-boundaries`).then((response) => response.ok ? response.json() : ({ type: "FeatureCollection", features: [] })),
-        fetch(`${apiBaseUrl}/api/v1/facilities`).then((response) => response.ok ? response.json() : ({ items: [] })),
-        ]);
-      })().then(([boundaries, facilities]) => {
-        const currentMap = map.current;
-        if (!currentMap) return;
+      currentMap.addLayer(createSwipeClipLayer("swipe-base-clip-end", null, swipePositionRef, modeRef));
+      currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-start", "right", swipePositionRef, modeRef));
+      currentMap.addLayer(createSwipeClipLayer("swipe-compare-clip-end", null, swipePositionRef, modeRef));
 
-        currentMap.addSource("admin-boundaries", {
-          type: "geojson",
-          data: boundaries,
-        });
-        currentMap.addLayer({
-          id: "admin-boundaries-fill",
-          type: "fill",
-          source: "admin-boundaries",
-          paint: { "fill-color": "#2dd4bf", "fill-opacity": 0.08 },
-        });
-        currentMap.addLayer({
-          id: "admin-boundaries-line",
-          type: "line",
-          source: "admin-boundaries",
-          paint: { "line-color": "#0f766e", "line-width": 1.2 },
-        });
+      void fetch(`${apiBaseUrl}/api/v1/admin-boundaries`)
+        .then((response) => response.ok ? response.json() : ({ type: "FeatureCollection", features: [] }))
+        .then((boundaries) => {
+          if (!map.current || currentMap.getSource("admin-boundaries")) return;
+          currentMap.addSource("admin-boundaries", { type: "geojson", data: boundaries });
+          currentMap.addLayer({ id: "admin-boundaries-fill", type: "fill", source: "admin-boundaries", paint: { "fill-color": "#2dd4bf", "fill-opacity": 0.08 } });
+          currentMap.addLayer({ id: "admin-boundaries-line", type: "line", source: "admin-boundaries", paint: { "line-color": "#0f766e", "line-width": 1.2 } });
+        })
+        .catch(() => undefined);
 
-        const facilityFeatures = (facilities.items ?? []).map((item: { id: number; geometry: unknown; name: string; category: string }) => ({
-          type: "Feature",
-          geometry: item.geometry,
-          properties: { id: item.id, name: item.name, category: item.category },
-        }));
-        currentMap.addSource("facilities", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: facilityFeatures },
-        });
-        currentMap.addLayer({
-          id: "facilities-points",
-          type: "circle",
-          source: "facilities",
-          paint: {
-            "circle-color": "#2563eb",
-            "circle-radius": 4,
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 1,
-          },
-        });
+      void fetch("/data/facilities-map.geojson")
+        .then((response) => response.ok ? response.json() : ({ type: "FeatureCollection", features: [] }))
+        .then((facilities) => {
+        if (!map.current) return;
+        if (currentMap.getSource("facilities")) return;
+        currentMap.addSource("facilities", { type: "geojson", data: facilities });
+        currentMap.addLayer({ id: "facilities-points", type: "circle", source: "facilities", paint: { "circle-color": "#2563eb", "circle-radius": 4, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 } });
         currentMap.on("mouseenter", "facilities-points", () => { currentMap.getCanvas().style.cursor = "pointer"; });
         currentMap.on("mouseleave", "facilities-points", () => { currentMap.getCanvas().style.cursor = ""; });
         currentMap.on("click", "facilities-points", async (event) => {
           const feature = event.features?.[0];
           const facilityId = feature?.properties?.id;
           if (!facilityId) return;
-          const popup = new maplibregl.Popup({ maxWidth: "340px" })
-            .setLngLat(event.lngLat)
-            .setHTML("<strong>시설 정보를 불러오는 중...</strong>")
-            .addTo(currentMap);
+          const popup = new maplibregl.Popup({ maxWidth: "340px" }).setLngLat(event.lngLat).setHTML("<strong>시설 정보를 불러오는 중...</strong>").addTo(currentMap);
           try {
             const response = await fetch(`${apiBaseUrl}/api/v1/facilities/${facilityId}`);
             if (!response.ok) throw new Error("facility request failed");
-            const detail = await response.json() as {
-              facility: { name: string; category: string; address: string };
-              attributes: Array<{ attribute_name: string; attribute_value: string }>;
-              trends: Array<{ title: string; trend_date: string; source_url: string; content_text: string }>;
-            };
+            const detail = await response.json() as { facility: { name: string; category: string; address: string }; attributes: Array<{ attribute_name: string; attribute_value: string }>; trends: Array<{ title: string; trend_date: string; source_url: string; content_text: string }> };
             const seriesResponse = await fetch(`${apiBaseUrl}/api/v1/facilities/${facilityId}/timeseries?start_year=2012&end_year=2025`);
             const series = seriesResponse.ok ? (await seriesResponse.json() as { series: Array<{ year: number; nightlight?: number; forestLossKm2?: number }> }).series : [];
             const attributes = detail.attributes.slice(0, 8).map((item) => `<li>${escapeHtml(item.attribute_name)}: ${escapeHtml(item.attribute_value)}</li>`).join("");
             const trends = detail.trends.slice(0, 5).map((item) => `<li>${escapeHtml(item.trend_date)} · ${escapeHtml(item.title)}</li>`).join("");
             const timeline = series.slice(-5).map((item) => `<li>${item.year}: 조도 ${item.nightlight == null ? "-" : item.nightlight.toFixed(2)} · 산림손실 ${item.forestLossKm2 == null ? "-" : item.forestLossKm2.toFixed(3)} km²</li>`).join("");
-            popup.setHTML(`
-              <div class="facility-popup">
-                <strong>${escapeHtml(detail.facility.name)}</strong>
-                <div>${escapeHtml(detail.facility.category)}</div>
-                <div>${escapeHtml(detail.facility.address)}</div>
-                ${attributes ? `<h4>속성</h4><ul>${attributes}</ul>` : ""}
-                ${trends ? `<h4>관련 동향</h4><ul>${trends}</ul>` : ""}
-                ${timeline ? `<h4>최근 시계열</h4><ul>${timeline}</ul>` : ""}
-              </div>
-            `);
+            popup.setHTML(`<div class="facility-popup"><strong>${escapeHtml(detail.facility.name)}</strong><div>${escapeHtml(detail.facility.category)}</div><div>${escapeHtml(detail.facility.address)}</div>${attributes ? `<h4>속성</h4><ul>${attributes}</ul>` : ""}${trends ? `<h4>관련 동향</h4><ul>${trends}</ul>` : ""}${timeline ? `<h4>최근 시계열</h4><ul>${timeline}</ul>` : ""}</div>`);
           } catch {
             popup.setHTML("<strong>시설 정보를 불러오지 못했습니다.</strong>");
           }
         });
       }).catch(() => undefined);
+
+      satelliteInitializedRef.current = true;
+      void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends, metric, mode)
+        .then(() => setSatelliteStatus("ready"))
+        .catch(() => setSatelliteStatus("unavailable"));
     });
     return () => { map.current?.remove(); map.current = null; };
   }, []);
   useEffect(() => {
-    if (!map.current?.isStyleLoaded()) return;
+    if (!map.current?.isStyleLoaded() || !satelliteInitializedRef.current) return;
     void updateNightlightLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
     void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
     void updateBaseRasterLayer(map.current, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
@@ -307,6 +303,13 @@ export default function MapCanvas() {
   }, [showBoundaries, showFacilities]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
+    {satelliteStatus !== "ready" && (
+      <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
+        {satelliteStatus === "loading"
+          ? "위성 분석 레이어를 준비하고 있습니다..."
+          : "위성 분석 레이어를 불러오지 못했습니다. 잠시 후 다시 시도해주세요."}
+      </div>
+    )}
     <SwipeControl enabled={mode === "swipe"} baseYear={baseYear} compareYear={compareYear} positionRef={swipePositionRef} onPositionChange={() => map.current?.triggerRepaint()} />
   </>;
 }
