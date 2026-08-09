@@ -1,8 +1,10 @@
 import json
+import logging
 import os
 from functools import lru_cache
 from html import escape
 from io import BytesIO
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
@@ -15,12 +17,13 @@ from .config import get_settings
 from .schemas import DataAvailability, DataRange, ReportJob, ReportRequest
 from .services.evidence import build_evidence_package
 from .services.hansen import hansen_tile_url
-from .services.timeseries import facility_timeseries
+from .services.persisted_stats import load_persisted_stats, stats_to_timeseries
 from .services.viirs import VIIRS_MONTHLY, initialize_earth_engine, viirs_tile_url
 from .services.hansen import HANSEN_GFC
 
 settings = get_settings()
 REPORTS: dict[str, dict[str, object]] = {}
+logger = logging.getLogger("uvicorn.error")
 app = FastAPI(title="Pyongyang Satellite Change Analysis API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -290,11 +293,15 @@ def facility_detail(facility_id: int) -> dict[str, object]:
 
 @app.get("/api/v1/facilities/{facility_id}/timeseries")
 def facility_timeseries_api(facility_id: int, start_year: int = 2012, end_year: int = 2025) -> dict[str, object]:
+    started = perf_counter()
+    if start_year > end_year:
+        raise HTTPException(status_code=422, detail="start_year must be less than or equal to end_year")
     try:
+        client = _supabase()
         response = (
-            _supabase()
+            client
             .table("facilities")
-            .select("facility_id,facility_name,longitude,latitude")
+            .select("facility_id,facility_name")
             .eq("facility_id", facility_id)
             .limit(1)
             .execute()
@@ -302,13 +309,13 @@ def facility_timeseries_api(facility_id: int, start_year: int = 2012, end_year: 
         if not response.data:
             raise HTTPException(status_code=404, detail="Facility not found")
         facility = response.data[0]
-        if facility.get("longitude") is None or facility.get("latitude") is None:
-            raise HTTPException(status_code=422, detail="Facility has no WGS84 coordinates")
-        series = facility_timeseries(float(facility["longitude"]), float(facility["latitude"]), start_year, end_year)
+        stats = load_persisted_stats(client, facility_id, start_year, end_year)
+        series = stats_to_timeseries(stats, start_year, end_year)
     except (HTTPException, ValueError):
         raise
     except Exception as error:
-        _supabase_error(error, "facility time series")
+        _supabase_error(error, "facility persisted time series")
+    logger.info("timeseries total: %.1f ms", (perf_counter() - started) * 1000)
     return {"facilityId": facility_id, "facilityName": facility["facility_name"], "series": series}
 
 
@@ -319,18 +326,18 @@ def facility_stats(facility_id: int, start_year: int = 2012, end_year: int = 202
         raise HTTPException(status_code=422, detail="start_year must be less than or equal to end_year")
     try:
         client = _supabase()
-        nightlight = client.table("nightlight_stats").select("*").eq("facility_id", facility_id).gte("year", start_year).lte("year", end_year).order("year").execute().data
-        forest = client.table("forest_stats").select("*").eq("facility_id", facility_id).gte("year", start_year).lte("year", end_year).order("year").execute().data
+        stats = load_persisted_stats(client, facility_id, start_year, end_year)
     except Exception as error:
         message = str(error)
         if "nightlight_stats" in message or "forest_stats" in message:
             raise HTTPException(status_code=503, detail="Satellite stats tables are not available; apply the stats migration first")
         _supabase_error(error, "facility persisted stats")
-    return {"facilityId": facility_id, "nightlight": nightlight, "forest": forest}
+    return {"facilityId": facility_id, "nightlight": stats["nightlight"], "forest": stats["forest"]}
 
 
 @app.get("/api/v1/facilities/{facility_id}/analysis")
 def facility_analysis(facility_id: int, start_year: int = 2012, end_year: int = 2025) -> dict[str, object]:
+    started = perf_counter()
     stats = facility_stats(facility_id, start_year, end_year)
     nightlight = [row for row in stats["nightlight"] if row.get("mean_radiance") is not None]
     forest = [row for row in stats["forest"] if row.get("annual_loss_km2") is not None]
@@ -356,6 +363,7 @@ def facility_analysis(facility_id: int, start_year: int = 2012, end_year: int = 
     interpretation = "야간 활동 또는 시설 가동 변화 가능성을 시사할 수 있으나, 단일 위성지표만으로 원인을 확정할 수 없습니다."
     if loss_total and loss_total > 0:
         interpretation += " 산림 변화가 함께 관측되어 토지이용 변화 자료와 추가 대조가 필요합니다."
+    logger.info("analysis total: %.1f ms", (perf_counter() - started) * 1000)
     return {"facilityId": facility_id, "period": {"start": start_year, "end": end_year}, "summary": summary, "observation": observation, "interpretation": interpretation, "confidence": "관측 기반 참고", "sources": ["NOAA VIIRS DNB monthly", "Hansen Global Forest Change"], "nightlightChangePct": change_pct, "forestLossKm2": loss_total, "series": stats}
 
 
