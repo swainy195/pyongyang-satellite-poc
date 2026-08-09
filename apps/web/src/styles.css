@@ -20,8 +20,11 @@ fieldset { border: 1px solid #d1d5db; border-radius: 6px; margin: 4px 0 12px; } 
 .swipe-control { position: absolute; inset: 0; z-index: 2; pointer-events: none; display: none; }
 .swipe-control.is-enabled { display: block; }
 .swipe-rail { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #ffffff; box-shadow: 0 0 0 1px #11182788, 0 0 10px #11182755; transform: translateX(-50%); }
-.swipe-label { position: absolute; top: 48px; padding: 4px 7px; border: 1px solid #ffffff99; border-radius: 4px; color: white; background: #111827aa; font-size: 11px; pointer-events: none; }
+.swipe-label { position: absolute; top: 14px; display: grid; gap: 1px; min-width: 86px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px; color: #111827; background: #fffffff2; box-shadow: 0 2px 8px #11182722; backdrop-filter: blur(4px); font-size: 11px; pointer-events: none; }
 .swipe-label-base { left: 12px; } .swipe-label-compare { right: 12px; }
+.swipe-label strong { font-size: 13px; font-weight: 700; }
+.swipe-label small { color: #6b7280; font-size: 11px; }
+.swipe-control.is-enabled ~ .map-caption { top: 84px; }
 .swipe-handle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 82px; padding: 7px 8px; border: 1px solid #ffffff; border-radius: 999px; color: #111827; background: white; box-shadow: 0 2px 8px #11182755; cursor: ew-resize; pointer-events: auto; touch-action: none; font-size: 12px; line-height: 1; }
 .swipe-handle:hover, .swipe-handle[data-dragging="true"] { background: #eff6ff; border-color: #2563eb; }
 .swipe-handle[data-dragging="true"] { cursor: grabbing; }
