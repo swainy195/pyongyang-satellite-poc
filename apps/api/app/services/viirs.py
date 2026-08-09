@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 import tempfile
 from pathlib import Path
 
@@ -27,12 +28,15 @@ def _credentials_path() -> str | None:
 @lru_cache
 def initialize_earth_engine() -> None:
     settings = get_settings()
+    project_id = settings.gee_project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "")
+    if not project_id:
+        raise RuntimeError("GEE_PROJECT_ID or GOOGLE_CLOUD_PROJECT is not configured")
     credentials_path = _credentials_path()
     if settings.gee_service_account and credentials_path:
         credentials = ee.ServiceAccountCredentials(settings.gee_service_account, credentials_path)
-        ee.Initialize(credentials=credentials, project=settings.gee_project_id)
+        ee.Initialize(credentials=credentials, project=project_id)
     else:
-        ee.Initialize(project=settings.gee_project_id)
+        ee.Initialize(project=project_id)
 
 
 def viirs_tile_url(year: int) -> str:

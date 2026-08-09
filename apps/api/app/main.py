@@ -1,4 +1,5 @@
 import json
+import os
 from functools import lru_cache
 from html import escape
 from io import BytesIO
@@ -80,22 +81,32 @@ def database_health() -> dict[str, str | bool]:
 
 @app.get("/api/v1/gee-status")
 def gee_status() -> dict[str, object]:
-    result: dict[str, object] = {
-        "connected": False,
-        "platform": "Google Earth Engine",
-        "datasets": {"viirs": "unknown", "hansen": "unknown"},
-    }
     try:
+        project_id = settings.gee_project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "")
+        if not project_id:
+            raise RuntimeError("GEE_PROJECT_ID or GOOGLE_CLOUD_PROJECT is not configured")
+
+        # Reuse the existing service-account / local-authentication path.
         initialize_earth_engine()
-        result["connected"] = True
         viirs_size = ee.ImageCollection(VIIRS_MONTHLY).limit(1).size().getInfo()
-        result["datasets"]["viirs"] = "available" if viirs_size else "empty"
-        ee.Image(HANSEN_GFC).getInfo()
-        result["datasets"]["hansen"] = "available"
+        hansen_id = ee.Image(HANSEN_GFC).get("system:id").getInfo()
+        if not viirs_size or not hansen_id:
+            raise RuntimeError("Required Earth Engine datasets are not accessible")
+        return {
+            "connected": True,
+            "status": "ok",
+            "project": project_id,
+            "datasets": {"viirs": "available", "hansen": "available"},
+        }
     except Exception as error:
-        result["error"] = f"{error.__class__.__name__}: {str(error)[:200]}"
-    result["status"] = "ok" if result["connected"] and all(value == "available" for value in result["datasets"].values()) else "degraded"
-    return result
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "connected": False,
+                "status": "error",
+                "error": f"{error.__class__.__name__}: {str(error)[:240]}",
+            },
+        ) from error
 
 
 @app.get("/api/v1/data-availability", response_model=DataAvailability)

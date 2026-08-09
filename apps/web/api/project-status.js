@@ -1,7 +1,14 @@
 const defaultBackendUrl = "https://pyongyang-satellite-poc.onrender.com";
 
-async function checkJson(url) {
-  const response = await fetch(url, { headers: { accept: "application/json" } });
+async function checkJson(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, { headers: { accept: "application/json" }, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   let body = null;
   try {
     body = await response.json();
@@ -86,6 +93,11 @@ export default async function handler(req, res) {
     status.satellite.error = error instanceof Error ? error.message : "GEE status request failed";
   }
 
-  status.status = status.backend.status === "ok" && status.database.status === "ok" ? "ok" : "degraded";
+  const componentStatuses = [status.frontend.status, status.backend.status, status.database.status, status.data.status, status.satellite.status];
+  status.status = componentStatuses.every((value) => value === "ok")
+    ? "ok"
+    : componentStatuses.some((value) => value === "error" || value === "degraded")
+      ? "partial"
+      : "unknown";
   res.status(200).json(status);
 }
