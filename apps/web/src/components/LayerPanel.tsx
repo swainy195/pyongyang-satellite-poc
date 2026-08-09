@@ -10,16 +10,22 @@ export default function LayerPanel() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
 
   async function searchFacilities(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = query.trim();
-    if (!trimmed) { setResults([]); return; }
+    if (!trimmed) { setResults([]); setSearchError(false); return; }
     setSearching(true);
+    setSearchError(false);
     try {
       const response = await fetch(`${apiBaseUrl}/api/v1/facilities?q=${encodeURIComponent(trimmed)}&limit=20`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json() as { items: SearchResult[] };
       setResults(payload.items ?? []);
+    } catch {
+      setResults([]);
+      setSearchError(true);
     } finally {
       setSearching(false);
     }
@@ -45,7 +51,7 @@ export default function LayerPanel() {
             </button>
           </li>)}
         </ul>}
-        {query.trim() && !searching && results.length === 0 && <p className="search-empty">검색 결과가 없습니다.</p>}
+        {query.trim() && !searching && results.length === 0 && <p className="search-empty">{searchError ? "검색 서버에 연결할 수 없습니다." : "검색 결과가 없습니다."}</p>}
       </section>
 
       <section className="control-group" aria-labelledby="analysis-heading">

@@ -24,7 +24,12 @@ REPORTS: dict[str, dict[str, object]] = {}
 app = FastAPI(title="Pyongyang Satellite Change Analysis API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.web_base_url, "http://localhost:5174", "http://127.0.0.1:5174"],
+    allow_origins=[
+        settings.web_base_url,
+        "https://pyongyang-satellite-poc.vercel.app",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
