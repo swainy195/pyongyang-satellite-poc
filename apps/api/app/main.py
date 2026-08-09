@@ -328,6 +328,81 @@ def facility_detail(facility_id: int) -> dict[str, object]:
     }
 
 
+@app.get("/api/v1/facilities/{facility_id}/trends")
+def facility_trends(
+    facility_id: int,
+    start_year: int | None = Query(default=None, ge=1900, le=2100),
+    end_year: int | None = Query(default=None, ge=1900, le=2100),
+    limit: int = Query(default=5, ge=1, le=20),
+) -> dict[str, object]:
+    if start_year is not None and end_year is not None and start_year > end_year:
+        raise HTTPException(status_code=422, detail="start_year must be less than or equal to end_year")
+
+    try:
+        client = _supabase()
+        facility_response = (
+            client.table("facilities")
+            .select("facility_id")
+            .eq("facility_id", facility_id)
+            .limit(1)
+            .execute()
+        )
+        if not facility_response.data:
+            raise HTTPException(status_code=404, detail="Facility not found")
+
+        links = (
+            client.table("trend_facilities")
+            .select("trend_id")
+            .eq("facility_id", facility_id)
+            .limit(100)
+            .execute()
+            .data
+        )
+        trend_ids = [row.get("trend_id") for row in links if row.get("trend_id") is not None]
+        rows: list[dict[str, object]] = []
+        if trend_ids:
+            query = (
+                client.table("trends")
+                .select("trend_id,title,trend_date,source_url,content_text")
+                .in_("trend_id", trend_ids)
+            )
+            if start_year is not None:
+                query = query.gte("trend_date", f"{start_year}-01-01")
+            if end_year is not None:
+                query = query.lte("trend_date", f"{end_year}-12-31")
+            rows = query.order("trend_date", desc=True).limit(limit).execute().data
+
+            # Prefer the analysis period, but keep the section useful when that period has no links.
+            if not rows and (start_year is not None or end_year is not None):
+                rows = (
+                    client.table("trends")
+                    .select("trend_id,title,trend_date,source_url,content_text")
+                    .in_("trend_id", trend_ids)
+                    .order("trend_date", desc=True)
+                    .limit(limit)
+                    .execute()
+                    .data
+                )
+    except HTTPException:
+        raise
+    except Exception as error:
+        _supabase_error(error, "facility related trends")
+
+    items = []
+    for row in rows:
+        content = row.get("content_text")
+        items.append({
+            "id": row.get("trend_id"),
+            "date": row.get("trend_date"),
+            "title": row.get("title"),
+            "summary": content[:240] if isinstance(content, str) else None,
+            "category": row.get("category"),
+            "source": row.get("source"),
+            "source_url": row.get("source_url"),
+        })
+    return {"facilityId": facility_id, "items": items, "count": len(items)}
+
+
 @app.get("/api/v1/facilities/{facility_id}/timeseries")
 def facility_timeseries_api(facility_id: int, start_year: int = 2012, end_year: int = 2025) -> dict[str, object]:
     started = perf_counter()

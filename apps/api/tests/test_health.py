@@ -83,3 +83,54 @@ def test_admin_boundaries_reads_supabase_table() -> None:
     assert response.status_code == 200
     assert response.json()["features"][0]["properties"]["admcd"] == "KP-01"
     assert response.json()["features"][0]["geometry"]["type"] == "MultiPolygon"
+
+
+def test_facility_trends_returns_latest_period_items() -> None:
+    class Query:
+        def __init__(self, data: list[dict[str, object]]) -> None:
+            self.data = data
+
+        def select(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def eq(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def limit(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def in_(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def gte(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def lte(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def order(self, *_args: object, **_kwargs: object) -> "Query":
+            return self
+
+        def execute(self) -> object:
+            return type("Result", (), {"data": self.data})()
+
+    queries = {
+        "facilities": Query([{"facility_id": 320344}]),
+        "trend_facilities": Query([{"trend_id": 7}]),
+        "trends": Query([{
+            "trend_id": 7,
+            "trend_date": "2024-03-12",
+            "title": "시설 관련 동향",
+            "content_text": "공개 자료 요약",
+            "source_url": "https://example.com/trend/7",
+        }]),
+    }
+    supabase = MagicMock()
+    supabase.table.side_effect = lambda name: queries[name]
+
+    with patch("app.main._supabase", return_value=supabase):
+        response = client.get("/api/v1/facilities/320344/trends?start_year=2014&end_year=2024")
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["title"] == "시설 관련 동향"
+    assert response.json()["items"][0]["summary"] == "공개 자료 요약"

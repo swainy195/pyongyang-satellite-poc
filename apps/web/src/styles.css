@@ -56,6 +56,15 @@ fieldset { border: 1px solid #d1d5db; border-radius: 6px; margin: 4px 0 12px; } 
 .analysis-observation { border-left: 3px solid #2563eb; padding-left: 10px; }
 .analysis-interpretation { border-left: 3px solid #0f766e; padding-left: 10px; }
 .analysis-note { margin-top: 12px; padding: 9px 10px; background: #f9fafb; color: #4b5563; font-size: 11px; line-height: 1.45; }
+.analysis-trends-intro { margin: 7px 0; color: #4b5563; font-size: 11px; }
+.analysis-trend-list { display: grid; gap: 6px; margin-top: 8px; }
+.analysis-trend-card { padding: 8px 9px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 11px; line-height: 1.45; }
+.analysis-trend-card small, .analysis-trend-card strong, .analysis-trend-card p { display: block; }
+.analysis-trend-card small { color: #6b7280; font-size: 10px; }
+.analysis-trend-card strong { margin-top: 2px; color: #1f2937; }
+.analysis-trend-card p { margin: 3px 0 0; color: #4b5563; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.analysis-trend-card a { display: inline-block; margin-top: 4px; color: #1d4ed8; font-size: 10px; }
+.analysis-trends-more { margin-top: 8px; padding: 5px 8px; border: 1px solid #d1d5db; color: #1d4ed8; background: #fff; font-size: 11px; }
 .analysis-sources { border-top: 1px solid #e5e7eb; margin-top: 12px; padding-top: 10px; font-size: 12px; }
 .analysis-meta { display: flex; flex-wrap: wrap; gap: 5px 8px; color: #6b7280; font-size: 10px; margin-top: 7px; line-height: 1.4; }
 .confidence-badge { border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 7px; color: #1d4ed8; background: #eff6ff; }

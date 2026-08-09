@@ -17,6 +17,15 @@ type Analysis = {
 };
 type Stats = { nightlight: NightlightPoint[]; forest: ForestPoint[] };
 type Timeseries = { series: Array<{ year: number; nightlight?: number | null; forestLossKm2?: number | null }> };
+type RelatedTrend = {
+  id: number;
+  date?: string | null;
+  title?: string | null;
+  summary?: string | null;
+  category?: string | null;
+  source?: string | null;
+  source_url?: string | null;
+};
 type FacilityDetail = {
   name: string;
   category?: string | null;
@@ -65,6 +74,8 @@ function SeriesChart({
 
 export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
+  const baseYear = useAnalysisStore((state) => state.baseYear);
+  const compareYear = useAnalysisStore((state) => state.compareYear);
   const [facility, setFacility] = useState<FacilityDetail | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -73,6 +84,9 @@ export default function AnalysisPanel() {
   const [statsStatus, setStatsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
   const [timeseriesStatus, setTimeseriesStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
   const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [trends, setTrends] = useState<RelatedTrend[]>([]);
+  const [trendsStatus, setTrendsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [showAllTrends, setShowAllTrends] = useState(false);
 
   useEffect(() => {
     if (!focus) {
@@ -145,6 +159,40 @@ export default function AnalysisPanel() {
     return () => controller.abort();
   }, [focus]);
 
+  useEffect(() => {
+    if (!focus) {
+      setTrends([]);
+      setTrendsStatus("idle");
+      setShowAllTrends(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setTrends([]);
+    setTrendsStatus("loading");
+    setShowAllTrends(false);
+
+    fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/trends?start_year=${baseYear}&end_year=${compareYear}&limit=5`, { signal: controller.signal })
+      .then(async (response) => {
+        if (response.status === 422) return { items: [] as RelatedTrend[] };
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json() as { items?: RelatedTrend[] };
+      })
+      .then((value) => {
+        if (controller.signal.aborted) return;
+        const items = value.items ?? [];
+        setTrends(items);
+        setTrendsStatus(items.length > 0 ? "ready" : "empty");
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error("Facility related trends request failed:", error);
+        setTrendsStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [focus, baseYear, compareYear]);
+
   const nightlightPoints: NightlightPoint[] = stats?.nightlight ?? analysis?.series.nightlight ?? timeseries?.series.map((point) => ({ year: point.year, mean_radiance: point.nightlight })) ?? [];
   const forestPoints: ForestPoint[] = stats?.forest ?? analysis?.series.forest ?? timeseries?.series.map((point) => ({ year: point.year, annual_loss_km2: point.forestLossKm2, cumulative_loss_km2: null })) ?? [];
   const firstNightlightPoint = nightlightPoints.find((point) => point.mean_radiance != null);
@@ -193,6 +241,26 @@ export default function AnalysisPanel() {
         <div className="analysis-section analysis-interpretation"><strong>해석</strong><span className="analysis-section-hint">관찰 결과를 바탕으로 한 참고 의견</span><p>{analysis.interpretation}</p></div>
       </>}
       <div className="analysis-note"><strong>주의</strong><p>단일 위성지표만으로 시설 운영 여부나 변화 원인을 확정할 수 없습니다. 관련 자료와 함께 참고해주세요.</p></div>
+
+      <section className="analysis-section analysis-trends" aria-live="polite">
+        <strong>관련 동향</strong>
+        <span className="analysis-section-hint">위성 관측 결과와 함께 참고할 수 있는 공개 동향입니다.</span>
+        {trendsStatus === "loading" && <p className="analysis-status" role="status">관련 동향을 불러오는 중...</p>}
+        {trendsStatus === "error" && <p className="analysis-status analysis-status-error" role="alert">관련 동향을 불러오지 못했습니다.</p>}
+        {trendsStatus === "empty" && <p className="analysis-status" role="status">이 시설과 연결된 관련 동향이 없습니다.</p>}
+        {trendsStatus === "ready" && <>
+          <p className="analysis-trends-intro">분석 기간 중 다음 관련 동향이 확인됩니다.</p>
+          <div className="analysis-trend-list">
+            {trends.slice(0, showAllTrends ? trends.length : 3).map((trend) => <article className="analysis-trend-card" key={trend.id}>
+              <small>{trend.date ?? "날짜 없음"}{trend.category ? ` · ${trend.category}` : ""}</small>
+              <strong>{trend.title ?? "제목 없음"}</strong>
+              {trend.summary && <p>{trend.summary}</p>}
+              {trend.source_url && <a href={trend.source_url} target="_blank" rel="noreferrer">원문 보기</a>}
+            </article>)}
+          </div>
+          {trends.length > 3 && <button type="button" className="analysis-trends-more" onClick={() => setShowAllTrends((value) => !value)}>{showAllTrends ? "간단히 보기" : "관련 동향 더보기"}</button>}
+        </>}
+      </section>
 
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />
