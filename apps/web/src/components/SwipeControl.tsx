@@ -46,10 +46,10 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  return <div className={`swipe-control${enabled ? " is-enabled" : ""}`} aria-hidden={!enabled}>
+  return <div ref={railRef} className={`swipe-control${enabled ? " is-enabled" : ""}`} aria-hidden={!enabled}>
     <div className="swipe-label swipe-label-base">{baseYear}년 기준</div>
     <div className="swipe-label swipe-label-compare">{compareYear}년 비교</div>
-    <div className="swipe-rail" ref={railRef} />
+    <div className="swipe-rail" />
     <button
       ref={handleRef}
       type="button"
