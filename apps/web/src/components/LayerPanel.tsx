@@ -135,7 +135,12 @@ export default function LayerPanel() {
             <legend>지도에 표시할 정보</legend>
             <label><input type="checkbox" checked={state.showBoundaries} onChange={(e) => state.setLayerVisible("boundaries", e.target.checked)} /> 행정경계</label>
             <label><input type="checkbox" checked={state.showTrends} onChange={(e) => state.setLayerVisible("trends", e.target.checked)} /> 위성 변화</label>
-            <label><input type="checkbox" checked={state.showFacilities} onChange={(e) => state.setLayerVisible("facilities", e.target.checked)} /> 주변 시설 위치</label>
+            <div className="facility-toggle">
+              <button type="button" className={state.showFacilities ? "is-active" : ""} aria-pressed={state.showFacilities} onClick={() => state.setLayerVisible("facilities", !state.showFacilities)}>
+                {state.showFacilities ? "전체 시설 숨기기" : "전체 시설 보기"}
+              </button>
+              <small>지도에 등록된 주요 시설 위치를 표시합니다.</small>
+            </div>
           </fieldset>
         </div>
       </details>
