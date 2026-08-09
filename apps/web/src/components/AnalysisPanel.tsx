@@ -74,6 +74,7 @@ function SeriesChart({
 
 export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
+  const metric = useAnalysisStore((state) => state.metric);
   const baseYear = useAnalysisStore((state) => state.baseYear);
   const compareYear = useAnalysisStore((state) => state.compareYear);
   const [facility, setFacility] = useState<FacilityDetail | null>(null);
@@ -207,10 +208,18 @@ export default function AnalysisPanel() {
     : analysis?.forestLossKm2 ?? null;
   const period = analysis?.period ?? { start: 2012, end: 2025 };
 
-  if (!focus) return null;
-  return <aside className="analysis-panel" aria-live="polite">
+  if (!focus) {
+    return metric === "combined" ? <aside className="analysis-panel analysis-panel-empty" aria-live="polite">
+      <span className="analysis-eyebrow">종합 분석</span>
+      <strong>시설을 선택해주세요</strong>
+      <p>시설을 선택하면 야간 불빛, 산림 변화, 관련 동향을 한 화면에서 함께 확인할 수 있습니다.</p>
+    </aside> : null;
+  }
+  const isCombined = metric === "combined";
+  const integratedObservation = `${period.start}~${period.end} 야간 불빛 관측값은 ${formatPercent(nightlightChangePct)} 변화했고, 같은 기간 산림손실은 ${formatArea(forestLossTotal)}로 집계되었습니다.${trendsStatus === "ready" ? ` 연결된 관련 동향 ${trends.length}건이 확인됩니다.` : ""}`;
+  return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}`} aria-live="polite">
     <div className="analysis-heading">
-      <div><span className="analysis-eyebrow">선택 시설 분석</span><strong>{facility?.name ?? focus.name}</strong></div>
+      <div><span className="analysis-eyebrow">{isCombined ? "종합 분석" : "선택 시설 분석"}</span><strong>{facility?.name ?? focus.name}</strong></div>
       <button type="button" onClick={() => useAnalysisStore.getState().setFocusFacility(null)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
     </div>
     {facility && <div className="analysis-facility-meta">
@@ -226,9 +235,10 @@ export default function AnalysisPanel() {
     {(statsStatus === "loading" || statsStatus === "error" || statsStatus === "empty") && <p className={`analysis-status${statsStatus === "error" ? " analysis-status-error" : ""}`} role={statsStatus === "error" ? "alert" : "status"}>{statsStatus === "loading" ? "통계 정보를 불러오는 중..." : statsStatus === "empty" ? "이 시설의 위성 통계가 아직 준비되지 않았습니다." : "통계 정보를 불러오지 못했습니다."}</p>}
     {(analysis || stats || timeseries) && <>
       {analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
-      <div className="analysis-kpis" aria-label="핵심 분석 지표">
+      <div className={`analysis-kpis${isCombined ? " is-integrated" : ""}`} aria-label="핵심 분석 지표">
         <div><span>야간 불빛 변화</span><strong>{formatPercent(nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>
         <div><span>산림손실</span><strong>{formatArea(forestLossTotal)}</strong><small>{period.start} → {period.end}년 누적</small></div>
+        {isCombined && <div><span>관련 동향</span><strong>{trendsStatus === "ready" ? `${trends.length}건` : "-"}</strong><small>분석 기간 기준</small></div>}
       </div>
 
       <div className="analysis-detail-grid">
@@ -237,12 +247,13 @@ export default function AnalysisPanel() {
       </div>
 
       {analysis && <>
+        {isCombined && <div className="analysis-section analysis-integrated-observation"><strong>종합 관찰</strong><span className="analysis-section-hint">기존 위성 통계와 연결된 공개 동향을 함께 정리한 내용</span><p>{integratedObservation}</p></div>}
         <div className="analysis-section analysis-observation"><strong>관찰</strong><span className="analysis-section-hint">데이터에서 직접 확인된 내용</span><p>{analysis.observation}</p></div>
         <div className="analysis-section analysis-interpretation"><strong>해석</strong><span className="analysis-section-hint">관찰 결과를 바탕으로 한 참고 의견</span><p>{analysis.interpretation}</p></div>
       </>}
-      <div className="analysis-note"><strong>주의</strong><p>단일 위성지표만으로 시설 운영 여부나 변화 원인을 확정할 수 없습니다. 관련 자료와 함께 참고해주세요.</p></div>
+      <div className="analysis-note"><strong>주의</strong><p>{isCombined ? "위성 관측값과 관련 동향은 시설 주변 변화를 살펴보기 위한 참고 자료입니다. 단일 지표나 동향만으로 시설 운영 상태, 정책 변화, 원인을 확정할 수 없습니다." : "단일 위성지표만으로 시설 운영 여부나 변화 원인을 확정할 수 없습니다. 관련 자료와 함께 참고해주세요."}</p></div>
 
-      <section className="analysis-section analysis-trends" aria-live="polite">
+      <section id="facility-related-trends" className="analysis-section analysis-trends" aria-live="polite">
         <strong>관련 동향</strong>
         <span className="analysis-section-hint">위성 관측 결과와 함께 참고할 수 있는 공개 동향입니다.</span>
         {trendsStatus === "loading" && <p className="analysis-status" role="status">관련 동향을 불러오는 중...</p>}
@@ -267,7 +278,8 @@ export default function AnalysisPanel() {
         <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" />
       </>}
 
-      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change</span></div></div>
+      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change{isCombined ? " · 관련 동향 데이터" : ""}</span></div></div>
+      {isCombined && <div className="analysis-evidence-links"><strong>근거 상세보기</strong><div><button type="button" onClick={() => useAnalysisStore.getState().setMetric("nightlight")}>야간 불빛 상세 보기</button><button type="button" onClick={() => useAnalysisStore.getState().setMetric("forest")}>산림 변화 상세 보기</button><button type="button" onClick={() => document.getElementById("facility-related-trends")?.scrollIntoView({ behavior: "smooth", block: "nearest" })}>관련 동향 보기</button></div></div>}
     </>}
     {analysisStatus === "error" && <div className="analysis-section analysis-status-error" role="alert"><strong>관찰·해석</strong><p>분석 문장을 불러오지 못했습니다. 위의 통계와 시계열을 기준으로 확인해주세요.</p></div>}
     {analysisStatus === "empty" && <div className="analysis-section" role="status"><strong>관찰·해석</strong><p>이 시설의 분석 문장이 아직 준비되지 않았습니다.</p></div>}
