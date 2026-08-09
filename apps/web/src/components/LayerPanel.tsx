@@ -130,6 +130,7 @@ export default function LayerPanel() {
               <option value="swipe">좌우로 비교</option><option value="split">좌우 분할</option><option value="difference">변화량</option><option value="timeline">시간 흐름</option>
             </select>
           </label>
+          <p className="mode-help">{state.mode === "swipe" ? "과거와 최근의 원본 영상을 직접 비교합니다." : state.mode === "difference" ? "현재는 두 연도 레이어를 겹쳐 보여줍니다. 실제 밝아짐·어두워짐 색상은 차이값 타일 연결이 필요합니다." : state.mode === "timeline" ? "연도별 변화를 시간 흐름으로 확인합니다." : "두 연도를 좌우 영역으로 나누어 비교합니다."}</p>
           <fieldset>
             <legend>지도에 표시할 정보</legend>
             <label><input type="checkbox" checked={state.showBoundaries} onChange={(e) => state.setLayerVisible("boundaries", e.target.checked)} /> 행정경계</label>

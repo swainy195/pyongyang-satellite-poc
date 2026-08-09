@@ -121,9 +121,9 @@ function applyComparisonOpacity(map: maplibregl.Map, mode: string) {
   }
 }
 
-function applyFacilityVisualPriority(map: maplibregl.Map, metric: string) {
+function applyFacilityVisualPriority(map: maplibregl.Map, metric: string, mode: string) {
   if (!map.getLayer("facilities-points")) return;
-  map.setPaintProperty("facilities-points", "circle-opacity", metric === "combined" ? 0.72 : metric === "forest" ? 0.46 : 0.4);
+  map.setPaintProperty("facilities-points", "circle-opacity", metric === "combined" ? 0.72 : mode === "difference" ? 0.28 : metric === "forest" ? 0.46 : 0.4);
 }
 
 function createSwipeClipLayer(
@@ -254,7 +254,7 @@ export default function MapCanvas() {
         currentMap.addSource("facilities", { type: "geojson", data: facilities });
         currentMap.addLayer({ id: "facilities-points", type: "circle", source: "facilities", paint: { "circle-color": "#2563eb", "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.35, 8, 0.5, 11, 0.8], "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2, 8, 3, 11, 5], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 } });
         currentMap.addLayer({ id: "facilities-selected", type: "circle", source: "facilities", filter: ["==", ["get", "id"], -1], paint: { "circle-color": "#ffffff", "circle-opacity": 0.95, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5, 8, 7, 11, 10], "circle-stroke-color": "#dc2626", "circle-stroke-width": 2.5 } });
-        applyFacilityVisualPriority(currentMap, metric);
+        applyFacilityVisualPriority(currentMap, metric, mode);
         currentMap.on("mouseenter", "facilities-points", () => { currentMap.getCanvas().style.cursor = "pointer"; });
         currentMap.on("mouseleave", "facilities-points", () => { currentMap.getCanvas().style.cursor = ""; });
         currentMap.on("click", "facilities-points", async (event) => {
@@ -306,13 +306,13 @@ export default function MapCanvas() {
     }
     if (currentMap.getLayer("facilities-points")) {
       currentMap.setLayoutProperty("facilities-points", "visibility", showFacilities ? "visible" : "none");
-      applyFacilityVisualPriority(currentMap, metric);
+      applyFacilityVisualPriority(currentMap, metric, mode);
     }
     if (currentMap.getLayer("facilities-selected")) {
       currentMap.setLayoutProperty("facilities-selected", "visibility", showFacilities && focusFacility ? "visible" : "none");
       currentMap.setFilter("facilities-selected", ["==", ["get", "id"], focusFacility?.id ?? -1]);
     }
-  }, [showBoundaries, showFacilities, focusFacility, metric]);
+  }, [showBoundaries, showFacilities, focusFacility, metric, mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
     {satelliteStatus !== "ready" && (
