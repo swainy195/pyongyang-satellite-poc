@@ -285,10 +285,17 @@ export default function MapCanvas() {
         .then((facilities) => {
         if (!map.current) return;
         if (currentMap.getSource("facilities")) return;
+        const currentState = useAnalysisStore.getState();
         currentMap.addSource("facilities", { type: "geojson", data: facilities });
         currentMap.addLayer({ id: "facilities-points", type: "circle", source: "facilities", paint: { "circle-color": "#2563eb", "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.35, 8, 0.5, 11, 0.8], "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2, 8, 3, 11, 5], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 } });
+        currentMap.addLayer({ id: "facilities-selected-halo", type: "circle", source: "facilities", filter: ["==", ["get", "id"], -1], paint: { "circle-color": "#60a5fa", "circle-opacity": 0.3, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 11, 8, 15, 11, 20], "circle-blur": 0.45, "circle-stroke-color": "#bfdbfe", "circle-stroke-width": 2 } });
         currentMap.addLayer({ id: "facilities-selected", type: "circle", source: "facilities", filter: ["==", ["get", "id"], -1], paint: { "circle-color": "#ffffff", "circle-opacity": 0.95, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5, 8, 7, 11, 10], "circle-stroke-color": "#dc2626", "circle-stroke-width": 2.5 } });
-        applyFacilityVisualPriority(currentMap, metric, mode);
+        currentMap.setLayoutProperty("facilities-points", "visibility", currentState.showFacilities ? "visible" : "none");
+        currentMap.setLayoutProperty("facilities-selected-halo", "visibility", currentState.focusFacility ? "visible" : "none");
+        currentMap.setLayoutProperty("facilities-selected", "visibility", currentState.focusFacility ? "visible" : "none");
+        currentMap.setFilter("facilities-selected-halo", ["==", ["get", "id"], currentState.focusFacility?.id ?? -1]);
+        currentMap.setFilter("facilities-selected", ["==", ["get", "id"], currentState.focusFacility?.id ?? -1]);
+        applyFacilityVisualPriority(currentMap, currentState.metric, currentState.mode);
         currentMap.on("mouseenter", "facilities-points", () => { currentMap.getCanvas().style.cursor = "pointer"; });
         currentMap.on("mouseleave", "facilities-points", () => { currentMap.getCanvas().style.cursor = ""; });
         currentMap.on("click", "facilities-points", async (event) => {
@@ -350,8 +357,12 @@ export default function MapCanvas() {
       applyFacilityVisualPriority(currentMap, metric, mode);
     }
     if (currentMap.getLayer("facilities-selected")) {
-      currentMap.setLayoutProperty("facilities-selected", "visibility", showFacilities && focusFacility ? "visible" : "none");
+      currentMap.setLayoutProperty("facilities-selected", "visibility", focusFacility ? "visible" : "none");
       currentMap.setFilter("facilities-selected", ["==", ["get", "id"], focusFacility?.id ?? -1]);
+    }
+    if (currentMap.getLayer("facilities-selected-halo")) {
+      currentMap.setLayoutProperty("facilities-selected-halo", "visibility", focusFacility ? "visible" : "none");
+      currentMap.setFilter("facilities-selected-halo", ["==", ["get", "id"], focusFacility?.id ?? -1]);
     }
   }, [showBoundaries, showFacilities, focusFacility, metric, mode]);
   return <>

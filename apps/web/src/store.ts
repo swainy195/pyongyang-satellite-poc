@@ -22,7 +22,7 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   baseYear: 2014,
   compareYear: 2024,
   showBoundaries: true,
-  showFacilities: true,
+  showFacilities: false,
   showTrends: true,
   focusFacility: null,
   setMetric: (metric) => set({ metric }),
