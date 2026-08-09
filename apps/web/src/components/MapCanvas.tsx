@@ -172,7 +172,7 @@ async function updateBaseRasterLayer(
   if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "visible");
 }
 
-function applyComparisonOpacity(map: maplibregl.Map, mode: string, metric = "") {
+function applyComparisonOpacity(map: maplibregl.Map, mode: string, metric = "", hasFocusedFacility = false) {
   const baseOpacity = mode === "split" ? 0.5 : mode === "difference" ? 0.08 : 0.62;
   const compareOpacity = mode === "split" ? 0.5 : mode === "difference" && metric === "forest" ? 0.58 : mode === "difference" ? 0.85 : 0.62;
   for (const id of ["viirs-nightlight-base", "hansen-forest-base"]) {
@@ -180,6 +180,9 @@ function applyComparisonOpacity(map: maplibregl.Map, mode: string, metric = "") 
   }
   for (const id of ["viirs-nightlight", "hansen-forest-loss"]) {
     if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", compareOpacity);
+  }
+  if (map.getLayer("viirs-nightlight-difference")) {
+    map.setPaintProperty("viirs-nightlight-difference", "raster-opacity", hasFocusedFacility ? 0.52 : 0.62);
   }
 }
 
@@ -420,6 +423,10 @@ export default function MapCanvas() {
       currentMap.setFilter("facilities-selected-halo", ["==", ["get", "id"], focusFacility?.id ?? -1]);
     }
   }, [showBoundaries, showFacilities, focusFacility, metric, mode]);
+  useEffect(() => {
+    if (!map.current) return;
+    applyComparisonOpacity(map.current, mode, metric, Boolean(focusFacility));
+  }, [focusFacility, metric, mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
     {satelliteStatus !== "ready" && (

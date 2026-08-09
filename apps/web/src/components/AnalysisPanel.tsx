@@ -29,6 +29,10 @@ function formatValue(value: number | null | undefined, digits = 2) {
   return value == null || !Number.isFinite(Number(value)) ? "-" : Number(value).toFixed(digits);
 }
 
+function formatArea(value: number | null | undefined) {
+  return value == null || !Number.isFinite(Number(value)) ? "데이터 없음" : `${Number(value).toFixed(3)} km²`;
+}
+
 function formatPercent(value: number | null | undefined) {
   return value == null || !Number.isFinite(Number(value)) ? "-" : `${value > 0 ? "+" : ""}${Number(value).toFixed(1)}%`;
 }
@@ -150,7 +154,9 @@ export default function AnalysisPanel() {
   const nightlightDelta = firstNightlight != null && lastNightlight != null ? lastNightlight - firstNightlight : null;
   const cumulativeForestLoss = forestPoints.length > 0 ? forestPoints[forestPoints.length - 1].cumulative_loss_km2 : null;
   const nightlightChangePct = firstNightlight != null && firstNightlight !== 0 && lastNightlight != null ? (lastNightlight - firstNightlight) / firstNightlight * 100 : analysis?.nightlightChangePct ?? null;
-  const forestLossTotal = stats?.forest.reduce((total, point) => total + Number(point.annual_loss_km2 ?? 0), 0) ?? analysis?.forestLossKm2 ?? null;
+  const forestLossTotal = stats?.forest.length
+    ? stats.forest.reduce((total, point) => total + Number(point.annual_loss_km2 ?? 0), 0)
+    : analysis?.forestLossKm2 ?? null;
   const period = analysis?.period ?? { start: 2012, end: 2025 };
 
   if (!focus) return null;
@@ -174,12 +180,12 @@ export default function AnalysisPanel() {
       {analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
       <div className="analysis-kpis" aria-label="핵심 분석 지표">
         <div><span>야간 불빛 변화</span><strong>{formatPercent(nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>
-        <div><span>산림손실</span><strong>{formatValue(forestLossTotal, 3)} km²</strong><small>{period.start} → {period.end}년 누적</small></div>
+        <div><span>산림손실</span><strong>{formatArea(forestLossTotal)}</strong><small>{period.start} → {period.end}년 누적</small></div>
       </div>
 
       <div className="analysis-detail-grid">
         <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
-        <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatValue(forestLossTotal, 3)} km²</b></div><small>누적 손실 {formatValue(cumulativeForestLoss, 3)} km²</small></section>
+        <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 손실 {formatArea(cumulativeForestLoss)}</small></section>
       </div>
 
       {analysis && <>
