@@ -3,6 +3,7 @@ import logging
 import os
 from functools import lru_cache
 from html import escape
+from html.parser import HTMLParser
 from io import BytesIO
 from time import perf_counter
 from uuid import uuid4
@@ -63,6 +64,24 @@ def _feature(row: dict) -> dict:
     properties = dict(row)
     geometry = _parse_geometry(properties.pop("geom", None))
     return {"type": "Feature", "geometry": geometry, "properties": properties}
+
+
+class _TextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+
+def _trend_summary(value: object, limit: int = 240) -> str | None:
+    if not isinstance(value, str):
+        return None
+    parser = _TextExtractor()
+    parser.feed(value)
+    text = " ".join(" ".join(parser.parts).split())
+    return text[:limit] if text else None
 
 
 def _supabase_error(error: Exception, resource: str) -> None:
@@ -390,12 +409,11 @@ def facility_trends(
 
     items = []
     for row in rows:
-        content = row.get("content_text")
         items.append({
             "id": row.get("trend_id"),
             "date": row.get("trend_date"),
             "title": row.get("title"),
-            "summary": content[:240] if isinstance(content, str) else None,
+            "summary": _trend_summary(row.get("content_text")),
             "category": row.get("category"),
             "source": row.get("source"),
             "source_url": row.get("source_url"),
