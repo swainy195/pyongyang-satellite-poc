@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+import ee
 from supabase import Client, create_client
 
 from .config import get_settings
@@ -14,7 +15,8 @@ from .schemas import DataAvailability, DataRange, ReportJob, ReportRequest
 from .services.evidence import build_evidence_package
 from .services.hansen import hansen_tile_url
 from .services.timeseries import facility_timeseries
-from .services.viirs import viirs_tile_url
+from .services.viirs import VIIRS_MONTHLY, initialize_earth_engine, viirs_tile_url
+from .services.hansen import HANSEN_GFC
 
 settings = get_settings()
 REPORTS: dict[str, dict[str, object]] = {}
@@ -74,6 +76,26 @@ def database_health() -> dict[str, str | bool]:
             "detail": f"{error.__class__.__name__}: {str(error)[:160]}",
         }
     return {"status": "ok", "connected": True}
+
+
+@app.get("/api/v1/gee-status")
+def gee_status() -> dict[str, object]:
+    result: dict[str, object] = {
+        "connected": False,
+        "platform": "Google Earth Engine",
+        "datasets": {"viirs": "unknown", "hansen": "unknown"},
+    }
+    try:
+        initialize_earth_engine()
+        result["connected"] = True
+        viirs_size = ee.ImageCollection(VIIRS_MONTHLY).limit(1).size().getInfo()
+        result["datasets"]["viirs"] = "available" if viirs_size else "empty"
+        ee.Image(HANSEN_GFC).getInfo()
+        result["datasets"]["hansen"] = "available"
+    except Exception as error:
+        result["error"] = f"{error.__class__.__name__}: {str(error)[:200]}"
+    result["status"] = "ok" if result["connected"] and all(value == "available" for value in result["datasets"].values()) else "degraded"
+    return result
 
 
 @app.get("/api/v1/data-availability", response_model=DataAvailability)

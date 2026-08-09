@@ -23,6 +23,7 @@ export default async function handler(req, res) {
     },
     backend: { provider: "Render", url: backendUrl, status: "unknown" },
     database: { provider: "Supabase", status: "unknown" },
+    data: { status: "unknown", tables: null },
     satellite: {
       platform: "Google Earth Engine",
       datasets: ["VIIRS Nighttime Lights", "Hansen Global Forest Change"],
@@ -67,12 +68,22 @@ export default async function handler(req, res) {
 
   try {
     const data = await checkJson(`${backendUrl}/api/v1/data-status`);
-    status.satellite.status = data.response.ok ? "ok" : "error";
+    status.data.status = data.response.ok ? "ok" : "error";
     status.satellite.http_status = data.response.status;
-    if (data.body) status.satellite.details = data.body;
+    if (data.body) status.data.tables = data.body.tables || data.body;
+  } catch (error) {
+    status.data.status = "error";
+    status.data.error = error instanceof Error ? error.message : "Data status request failed";
+  }
+
+  try {
+    const gee = await checkJson(`${backendUrl}/api/v1/gee-status`);
+    status.satellite.status = gee.response.ok && gee.body?.status === "ok" ? "ok" : "degraded";
+    status.satellite.http_status = gee.response.status;
+    if (gee.body) status.satellite.details = gee.body;
   } catch (error) {
     status.satellite.status = "error";
-    status.satellite.error = error instanceof Error ? error.message : "Satellite status request failed";
+    status.satellite.error = error instanceof Error ? error.message : "GEE status request failed";
   }
 
   status.status = status.backend.status === "ok" && status.database.status === "ok" ? "ok" : "degraded";
