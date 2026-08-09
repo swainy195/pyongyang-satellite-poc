@@ -1,9 +1,29 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAnalysisStore, type CompareMode, type Metric } from "../store";
 import { apiBaseUrl } from "../api";
 
 
 type SearchResult = { id: number; name: string; category: string; longitude: number; latitude: number };
+type SearchPhase = "idle" | "searching" | "retrying" | "error";
+
+const SEARCH_TIMEOUT_MS = 70_000;
+const SEARCH_RETRY_DELAY_MS = 1_500;
+
+class SearchHttpError extends Error {
+  constructor(public readonly status: number) {
+    super(`Facility search failed with HTTP ${status}`);
+    this.name = "SearchHttpError";
+  }
+}
+
+function isRetryableSearchError(error: unknown) {
+  if (error instanceof SearchHttpError) return [502, 503, 504].includes(error.status);
+  return error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError");
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
 
 export default function LayerPanel() {
   const state = useAnalysisStore();
@@ -11,26 +31,65 @@ export default function LayerPanel() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
+  const requestIdRef = useRef(0);
+  const activeControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    requestIdRef.current += 1;
+    activeControllerRef.current?.abort();
+  }, []);
 
   async function searchFacilities(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = query.trim();
-    if (!trimmed) { setResults([]); setSearchError(false); return; }
+    if (!trimmed || searching) {
+      if (!trimmed) { setResults([]); setSearchError(false); setSearchPhase("idle"); }
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    activeControllerRef.current?.abort();
     setSearching(true);
     setSearchError(false);
+    setSearchPhase("searching");
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/v1/facilities?q=${encodeURIComponent(trimmed)}&limit=20`,
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json() as { items: SearchResult[] };
-      setResults(payload.items ?? []);
+      let payload: { items: SearchResult[] } | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (attempt > 0) setSearchPhase("retrying");
+        const controller = new AbortController();
+        activeControllerRef.current = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+        try {
+          const response = await fetch(
+            `${apiBaseUrl}/api/v1/facilities?q=${encodeURIComponent(trimmed)}&limit=20`,
+            { signal: controller.signal },
+          );
+          if (!response.ok) throw new SearchHttpError(response.status);
+          payload = await response.json() as { items: SearchResult[] };
+          break;
+        } catch (error) {
+          if (requestId !== requestIdRef.current) return;
+          if (attempt === 0 && isRetryableSearchError(error)) {
+            await wait(SEARCH_RETRY_DELAY_MS);
+            continue;
+          }
+          throw error;
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      }
+      if (requestId === requestIdRef.current && payload) {
+        setResults(payload.items ?? []);
+        setSearchError(false);
+        setSearchPhase("idle");
+      }
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Facility search failed", error);
-      setResults([]);
       setSearchError(true);
+      setSearchPhase("error");
     } finally {
-      setSearching(false);
+      if (requestId === requestIdRef.current) setSearching(false);
     }
   }
 
@@ -44,7 +103,7 @@ export default function LayerPanel() {
           <label htmlFor="facility-query">시설 검색</label>
           <div className="search-row">
             <input id="facility-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="시설명을 입력하세요" />
-            <button type="submit" aria-label="시설 검색">{searching ? "검색 중" : "검색"}</button>
+            <button type="submit" disabled={searching} aria-label="시설 검색">{searching ? "검색 중..." : "검색"}</button>
           </div>
         </form>
         {results.length > 0 && <ul className="search-results" aria-label="시설 검색 결과">
@@ -54,7 +113,9 @@ export default function LayerPanel() {
             </button>
           </li>)}
         </ul>}
-        {query.trim() && !searching && results.length === 0 && <p className="search-empty">{searchError ? "검색 서버에 연결할 수 없습니다." : "검색 결과가 없습니다."}</p>}
+        {searching && <p className="search-status" role="status">{searchPhase === "retrying" ? "검색 서버를 준비하고 있습니다. 잠시만 기다려주세요." : "시설을 검색하고 있습니다."}</p>}
+        {query.trim() && !searching && searchError && <p className="search-empty" role="alert">검색 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.</p>}
+        {query.trim() && !searching && !searchError && results.length === 0 && <p className="search-empty">검색 결과가 없습니다.</p>}
       </section>
 
       <section className="control-group" aria-labelledby="analysis-heading">

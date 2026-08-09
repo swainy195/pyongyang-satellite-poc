@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MapCanvas from "./components/MapCanvas";
 import LayerPanel from "./components/LayerPanel";
 import AnalysisPanel from "./components/AnalysisPanel";
@@ -11,6 +11,12 @@ const modeLabels = { swipe: "스와이프 비교", split: "좌우 분할", diffe
 export default function App() {
   const state = useAnalysisStore();
   const [reportStatus, setReportStatus] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(`${apiBaseUrl}/health`, { signal: controller.signal }).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
 
   const changeYear = (delta: number) => {
     state.setYears(state.baseYear, Math.max(2012, Math.min(2025, state.compareYear + delta)));
