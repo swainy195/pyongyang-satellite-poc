@@ -1,0 +1,19 @@
+# Pyongyang Satellite Analysis PoC
+
+This website provides a proof-of-concept service for satellite-based analysis of North Korea.
+
+## Main service
+
+https://pyongyang-satellite-poc.vercel.app/
+
+## AI-readable page
+
+https://pyongyang-satellite-poc.vercel.app/ai-test.html
+
+## Main features
+
+- VIIRS nighttime light analysis
+- Hansen Global Forest Change analysis
+- Satellite imagery comparison
+- North Korea facility information
+- Evidence-based analysis with observations, interpretations, and sources
