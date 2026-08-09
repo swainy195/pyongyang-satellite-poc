@@ -123,7 +123,7 @@ function applyComparisonOpacity(map: maplibregl.Map, mode: string) {
 
 function applyFacilityVisualPriority(map: maplibregl.Map, metric: string, mode: string) {
   if (!map.getLayer("facilities-points")) return;
-  map.setPaintProperty("facilities-points", "circle-opacity", metric === "combined" ? 0.72 : mode === "difference" ? 0.28 : metric === "forest" ? 0.46 : 0.4);
+  map.setPaintProperty("facilities-points", "circle-opacity", metric === "combined" ? 0.72 : mode === "difference" ? 0.28 : metric === "forest" ? 0.4 : 0.32);
 }
 
 function createSwipeClipLayer(
