@@ -27,23 +27,23 @@ def test_nightlight_difference_tile_metadata() -> None:
         "neutral_threshold": 0.3,
     }
     with patch("app.main.viirs_difference_tile", return_value=visualization):
-        response = client.get("/api/v1/map/tiles/nightlight/difference?base_year=2014&compare_year=2024")
+        response = client.get("/api/v1/map/tiles/nightlight/difference?base_year=2014&compare_year=2025")
 
     assert response.status_code == 200
     assert response.json()["operation"] == "compare_year_minus_base_year"
     assert response.json()["base_year"] == 2014
-    assert response.json()["compare_year"] == 2024
+    assert response.json()["compare_year"] == 2025
     assert response.json()["neutral_threshold"] == 0.3
 
 
 def test_forest_period_tile_metadata() -> None:
     with patch("app.main.hansen_period_tile_url", return_value="https://earthengine.example/{z}/{x}/{y}"):
-        response = client.get("/api/v1/map/tiles/forest/period?start_year=2014&end_year=2024")
+        response = client.get("/api/v1/map/tiles/forest/period?start_year=2014&end_year=2025")
 
     assert response.status_code == 200
     assert response.json()["operation"] == "forest_loss_between_years"
     assert response.json()["start_year"] == 2014
-    assert response.json()["end_year"] == 2024
+    assert response.json()["end_year"] == 2025
 
 
 def test_database_health_uses_supabase_sdk() -> None:
@@ -129,7 +129,7 @@ def test_facility_trends_returns_latest_period_items() -> None:
     supabase.table.side_effect = lambda name: queries[name]
 
     with patch("app.main._supabase", return_value=supabase):
-        response = client.get("/api/v1/facilities/320344/trends?start_year=2014&end_year=2024")
+        response = client.get("/api/v1/facilities/320344/trends?start_year=2014&end_year=2025")
 
     assert response.status_code == 200
     assert response.json()["items"][0]["title"] == "시설 관련 동향"
@@ -150,7 +150,7 @@ def test_report_contains_facility_analysis_sections() -> None:
             "observation": "관측 내용",
             "interpretation": "참고 해석",
             "confidence": "관측 기반 참고",
-            "series": {"nightlight": [{"year": 2014, "mean_radiance": 1.0}, {"year": 2024, "mean_radiance": 3.0}]},
+        "series": {"nightlight": [{"year": 2014, "mean_radiance": 1.0}, {"year": 2025, "mean_radiance": 3.0}]},
         },
     ), patch(
         "app.main.facility_trends",
@@ -159,7 +159,7 @@ def test_report_contains_facility_analysis_sections() -> None:
         response = client.post("/api/v1/reports", json={
             "admin_code": "ALL",
             "period_start": "2014-01-01",
-            "period_end": "2024-12-31",
+        "period_end": "2025-12-31",
             "facility_ids": ["320344"],
             "metrics": ["combined"],
         })

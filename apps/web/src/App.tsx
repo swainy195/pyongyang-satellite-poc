@@ -76,7 +76,7 @@ export default function App() {
       </section>
       <footer>
         <button type="button" onClick={() => changeYear(-1)} title="이전 연도">이전</button>
-        <span className="year-control-label">현재 연도: <strong>{state.compareYear}년</strong></span>
+        <span className="year-control-label">선택 연도: <strong>{state.compareYear}년</strong></span>
         <input aria-label="비교연도 탐색" type="range" min="2012" max="2025" value={state.compareYear} onChange={(e) => changeYear(Number(e.target.value) - state.compareYear)} />
         <button type="button" onClick={() => changeYear(-1)} title="연도 재생">재생</button><button type="button" onClick={() => changeYear(1)} title="다음 연도">다음</button>
       </footer>

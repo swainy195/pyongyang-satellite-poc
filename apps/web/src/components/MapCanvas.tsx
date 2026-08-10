@@ -348,7 +348,8 @@ export default function MapCanvas() {
             const response = await fetch(`${apiBaseUrl}/api/v1/facilities/${facilityId}`);
             if (!response.ok) throw new Error("facility request failed");
             const detail = await response.json() as { facility: { name: string; category: string; address: string }; attributes: Array<{ attribute_name: string; attribute_value: string }>; trends: Array<{ title: string; trend_date: string; source_url: string; content_text: string }> };
-            const seriesResponse = await fetch(`${apiBaseUrl}/api/v1/facilities/${facilityId}/timeseries?start_year=2012&end_year=2025`);
+            const currentState = useAnalysisStore.getState();
+            const seriesResponse = await fetch(`${apiBaseUrl}/api/v1/facilities/${facilityId}/timeseries?start_year=${currentState.baseYear}&end_year=${currentState.compareYear}`);
             const series = seriesResponse.ok ? (await seriesResponse.json() as { series: Array<{ year: number; nightlight?: number; forestLossKm2?: number }> }).series : [];
             const attributes = detail.attributes.slice(0, 8).map((item) => `<li>${escapeHtml(item.attribute_name)}: ${escapeHtml(item.attribute_value)}</li>`).join("");
             const trends = detail.trends.slice(0, 5).map((item) => `<li>${escapeHtml(item.trend_date)} · ${escapeHtml(item.title)}</li>`).join("");

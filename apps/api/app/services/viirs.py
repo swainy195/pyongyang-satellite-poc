@@ -10,7 +10,7 @@ from ..config import get_settings
 VIIRS_MONTHLY = "NOAA/VIIRS/DNB/MONTHLY_V1/VCMSLCFG"
 PALETTE = ["#111827", "#312e81", "#7e22ce", "#f97316", "#fde047"]
 DIFFERENCE_PALETTE = ["#0891b2", "#67e8f9", "#e5e7eb", "#fdba74", "#f59e0b"]
-# The 2014-2024 ROI distribution has a broad quantized plateau at 0.3605.
+# The 2014-2025 ROI distribution has a broad quantized plateau at 0.3605.
 # A 0.5 floor leaves roughly 10% of pixels while suppressing that plateau.
 DIFFERENCE_NEUTRAL_FLOOR = 0.5
 

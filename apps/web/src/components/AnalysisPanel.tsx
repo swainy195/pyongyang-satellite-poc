@@ -147,21 +147,21 @@ export default function AnalysisPanel() {
     );
     void handleResponse<Stats>(
       "Facility stats",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=2012&end_year=2025`, { signal: statsController.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=${baseYear}&end_year=${compareYear}`, { signal: statsController.signal }),
       statsController,
       setStats,
       (value) => setStatsStatus(value),
     );
     void handleResponse<Timeseries>(
       "Facility timeseries",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=2012&end_year=2025`, { signal: timeseriesController.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=${baseYear}&end_year=${compareYear}`, { signal: timeseriesController.signal }),
       timeseriesController,
       setTimeseries,
       (value) => setTimeseriesStatus(value),
     );
     void handleResponse<Analysis>(
       "Facility analysis",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=2012&end_year=2025`, { signal: analysisController.signal }),
+      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=${baseYear}&end_year=${compareYear}`, { signal: analysisController.signal }),
       analysisController,
       setAnalysis,
       (value) => setAnalysisStatus(value),
@@ -173,7 +173,7 @@ export default function AnalysisPanel() {
       timeseriesController.abort();
       analysisController.abort();
     };
-  }, [focus]);
+  }, [focus, baseYear, compareYear]);
 
   useEffect(() => {
     if (!focus) {

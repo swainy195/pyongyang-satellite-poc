@@ -20,7 +20,7 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   metric: "nightlight",
   mode: "difference",
   baseYear: 2014,
-  compareYear: 2024,
+  compareYear: 2025,
   showBoundaries: true,
   showFacilities: false,
   showTrends: true,
