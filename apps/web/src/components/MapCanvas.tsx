@@ -437,6 +437,14 @@ export default function MapCanvas() {
           : "위성 레이어를 불러오지 못했습니다."}
       </div>
     )}
-    <SwipeControl enabled={mode === "swipe"} baseYear={baseYear} compareYear={compareYear} positionRef={swipePositionRef} onPositionChange={() => map.current?.triggerRepaint()} />
+    <SwipeControl
+      enabled={mode === "swipe"}
+      baseYear={baseYear}
+      compareYear={compareYear}
+      positionRef={swipePositionRef}
+      onPositionChange={() => map.current?.triggerRepaint()}
+      onDragStart={() => map.current?.dragPan.disable()}
+      onDragEnd={() => map.current?.dragPan.enable()}
+    />
   </>;
 }

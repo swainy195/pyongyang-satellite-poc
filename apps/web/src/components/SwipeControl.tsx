@@ -6,12 +6,15 @@ type SwipeControlProps = {
   compareYear: number;
   positionRef: { current: number };
   onPositionChange: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 };
 
-export default function SwipeControl({ enabled, baseYear, compareYear, positionRef, onPositionChange }: SwipeControlProps) {
+export default function SwipeControl({ enabled, baseYear, compareYear, positionRef, onPositionChange, onDragStart, onDragEnd }: SwipeControlProps) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<HTMLButtonElement | null>(null);
+  const draggingRef = useRef(false);
 
   const syncPositionVisuals = () => {
     const left = `${positionRef.current * 100}%`;
@@ -20,6 +23,10 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   };
 
   useEffect(() => {
+    if (enabled) {
+      positionRef.current = 0.5;
+      onPositionChange();
+    }
     syncPositionVisuals();
   }, [enabled, positionRef]);
 
@@ -35,12 +42,15 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    draggingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.dataset.dragging = "true";
+    onDragStart?.();
+    updatePosition(event.clientX);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (event.currentTarget.dataset.dragging !== "true") return;
+    if (!draggingRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     updatePosition(event.clientX);
@@ -49,8 +59,10 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    draggingRef.current = false;
     event.currentTarget.dataset.dragging = "false";
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    onDragEnd?.();
   };
 
   return <div ref={railRef} className={`swipe-control${enabled ? " is-enabled" : ""}`} aria-hidden={!enabled}>
