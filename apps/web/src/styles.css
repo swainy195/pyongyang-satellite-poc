@@ -195,12 +195,16 @@ header p { max-width: 760px; }
 .analysis-panel-summary > .analysis-guide:not(.analysis-guide-summary) { display: none; }
 .analysis-guide-summary { margin-top: 10px; }
 .analysis-panel-summary { max-height: none; overflow: visible; }
-.analysis-summary-trend { margin-top: 8px; }
+.analysis-panel-summary .analysis-facility-meta { margin-bottom: 8px; }
+.analysis-panel-summary .analysis-guide-summary { margin-top: 8px; }
+.analysis-summary-trend { margin-top: 15px; }
 .analysis-summary-trend-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .analysis-summary-trend-header strong { color: #0f766e; font-size: 18px; }
 .analysis-summary-trend-item { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; }
 .analysis-summary-trend-item small { display: block; margin-bottom: 4px; color: #64748b; font-size: 12px; }
 .analysis-summary-trend-item strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 1.4; }
+.analysis-panel-summary .analysis-kpis { margin-top: 14px; }
+.analysis-panel-summary .analysis-kpis > div { padding: 12px 14px; }
 .analysis-summary { margin-top: 10px; }
 .swipe-label { display: grid; gap: 1px; min-width: 64px; }
 .swipe-label small { color: #d1d5db; font-size: 10px; }
