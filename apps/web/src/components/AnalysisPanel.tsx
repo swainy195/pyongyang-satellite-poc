@@ -74,7 +74,6 @@ function SeriesChart({
 
 export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
-  const selectedMetric = useAnalysisStore((state) => state.selectedMetric);
   const metric = useAnalysisStore((state) => state.metric);
   const baseYear = useAnalysisStore((state) => state.baseYear);
   const compareYear = useAnalysisStore((state) => state.compareYear);
@@ -146,20 +145,6 @@ export default function AnalysisPanel() {
       (value) => setFacility(value.facility),
       (value) => setDetailStatus(value === "empty" ? "error" : value),
     );
-    if (!selectedMetric) {
-      setStats(null);
-      setTimeseries(null);
-      setAnalysis(null);
-      setStatsStatus("idle");
-      setTimeseriesStatus("idle");
-      setAnalysisStatus("idle");
-      return () => {
-        detailController.abort();
-        statsController.abort();
-        timeseriesController.abort();
-        analysisController.abort();
-      };
-    }
     void handleResponse<Stats>(
       "Facility stats",
       fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=${baseYear}&end_year=${compareYear}`, { signal: statsController.signal }),
@@ -188,10 +173,10 @@ export default function AnalysisPanel() {
       timeseriesController.abort();
       analysisController.abort();
     };
-  }, [focus, selectedMetric, baseYear, compareYear]);
+  }, [focus, baseYear, compareYear]);
 
   useEffect(() => {
-    if (!focus || !selectedMetric) {
+    if (!focus) {
       setTrends([]);
       setTrendsStatus("idle");
       setShowAllTrends(false);
@@ -222,7 +207,7 @@ export default function AnalysisPanel() {
       });
 
     return () => controller.abort();
-  }, [focus, selectedMetric, baseYear, compareYear]);
+  }, [focus, baseYear, compareYear]);
 
   const nightlightPoints: NightlightPoint[] = stats?.nightlight ?? analysis?.series.nightlight ?? timeseries?.series.map((point) => ({ year: point.year, mean_radiance: point.nightlight })) ?? [];
   const forestPoints: ForestPoint[] = stats?.forest ?? analysis?.series.forest ?? timeseries?.series.map((point) => ({ year: point.year, annual_loss_km2: point.forestLossKm2, cumulative_loss_km2: null })) ?? [];
@@ -244,20 +229,6 @@ export default function AnalysisPanel() {
       <strong>시설을 선택해주세요</strong>
       <p>시설을 선택하면 야간 불빛, 산림 변화, 관련 동향을 한 화면에서 함께 확인할 수 있습니다.</p>
     </aside> : null;
-  }
-  if (!selectedMetric) {
-    return <aside className="analysis-panel" aria-live="polite">
-      <div className="analysis-heading">
-        <div><span className="analysis-eyebrow">시설 기본정보</span><strong>{facility?.name ?? focus.name}</strong></div>
-        <button type="button" onClick={() => useAnalysisStore.getState().setFocusFacility(null)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
-      </div>
-      {facility && <div className="analysis-facility-meta">
-        <span>{facility.category || "분류 정보 없음"}</span>
-        <span>{facility.address || "주소 정보 없음"}</span>
-        {facility.longitude != null && facility.latitude != null && <small>{Number(facility.longitude).toFixed(4)}, {Number(facility.latitude).toFixed(4)}</small>}
-      </div>}
-      <p className="analysis-guide">분석할 항목을 선택해주세요.</p>
-    </aside>;
   }
   const isCombined = metric === "combined";
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;

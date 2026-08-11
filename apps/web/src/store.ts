@@ -40,5 +40,5 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   },
   setFocusFacility: (facility) => set(facility
     ? { focusFacility: facility, selectedMetric: null }
-    : { focusFacility: null, selectedMetric: null }),
+    : { focusFacility: null, selectedMetric: null, metric: "nightlight", mode: "difference" }),
 }));
