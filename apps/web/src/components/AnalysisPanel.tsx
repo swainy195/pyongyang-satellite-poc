@@ -79,6 +79,7 @@ function SeriesChart({
 
 export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
+  const analysisPanelOpen = useAnalysisStore((state) => state.analysisPanelOpen);
   const metric = useAnalysisStore((state) => state.metric);
   const baseYear = useAnalysisStore((state) => state.baseYear);
   const compareYear = useAnalysisStore((state) => state.compareYear);
@@ -230,6 +231,7 @@ export default function AnalysisPanel() {
   const hasObservedForestLoss = forestPoints.some((point) => Number(point.annual_loss_km2) > 0);
   const period = analysis?.period ?? { start: 2012, end: 2025 };
 
+  if (!analysisPanelOpen) return null;
   if (!focus) {
     return metric === "combined" ? <aside className="analysis-panel analysis-panel-empty" aria-live="polite">
       <span className="analysis-eyebrow">종합 분석</span>
@@ -242,7 +244,7 @@ export default function AnalysisPanel() {
   return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}`} aria-live="polite">
     <div className="analysis-heading">
       <div><span className="analysis-eyebrow">{isCombined ? "종합 분석" : "선택 시설 분석"}</span><strong>{facility?.name ?? focus.name}</strong></div>
-      <button type="button" onClick={() => useAnalysisStore.getState().setFocusFacility(null)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
+      <button type="button" onClick={() => useAnalysisStore.getState().setAnalysisPanelOpen(false)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
     </div>
     {facility && <div className="analysis-facility-meta">
       <span>{facility.category || "분류 정보 없음"}</span>

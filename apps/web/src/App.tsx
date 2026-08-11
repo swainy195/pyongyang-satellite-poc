@@ -64,6 +64,7 @@ export default function App() {
         <div className="brand-block"><span className="brand-kicker">북한 위성정보 분석 서비스</span><h1>북한의 변화를 위성으로 살펴보세요</h1><p>주요 시설을 찾고, 과거와 최근의 야간 불빛·산림 변화를 비교할 수 있습니다.</p></div>
         <div className="header-actions">
           {reportStatus && <span role="status">{reportStatus}</span>}
+          {state.focusFacility && <button type="button" onClick={() => state.setFocusFacility(null)} title="처음으로">처음으로</button>}
           <button type="button" onClick={createReport} disabled={!state.focusFacility || reportLoading} title={reportHint} aria-label={reportHint}>{reportLoading ? "보고서를 준비하는 중..." : "분석 보고서 만들기"}</button>
         </div>
       </header>
