@@ -46,6 +46,11 @@ function formatPercent(value: number | null | undefined) {
   return value == null || !Number.isFinite(Number(value)) ? "-" : `${value > 0 ? "+" : ""}${Number(value).toFixed(1)}%`;
 }
 
+function formatTrendDate(value: string | null | undefined) {
+  if (!value) return "";
+  return value.slice(0, 10).replaceAll("-", ".");
+}
+
 function SeriesChart({
   points,
   value,
@@ -242,6 +247,7 @@ export default function AnalysisPanel() {
   }
   const isSummary = selectedMetric == null;
   const isCombined = selectedMetric === "combined";
+  const representativeTrend = trendsStatus === "ready" && trends.length > 0 ? trends[0] : null;
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
   return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}${isSummary ? " analysis-panel-summary" : ""}`} aria-live="polite">
     <div className="analysis-heading">
@@ -261,7 +267,16 @@ export default function AnalysisPanel() {
     {(statsStatus === "loading" || statsStatus === "error" || statsStatus === "empty") && <p className={`analysis-status${statsStatus === "error" ? " analysis-status-error" : ""}`} role={statsStatus === "error" ? "alert" : "status"}>{statsStatus === "loading" ? "통계 정보를 불러오는 중..." : statsStatus === "empty" ? "이 시설의 위성 통계가 아직 준비되지 않았습니다." : "통계 정보를 불러오지 못했습니다."}</p>}
     {isSummary && <>
       <p className="analysis-guide analysis-guide-summary">{"\uC9C0\uB3C4\uC5D0\uC11C \uD655\uC778\uD560 \uBD84\uC11D \uD56D\uBAA9\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694."}</p>
-      <div className="analysis-summary-trend"><span>{"\uAD00\uB828 \uB3D9\uD5A5"}</span><strong>{trendsStatus === "ready" ? `${trends.length}\uAC74` : "-"}</strong></div>
+      <div className="analysis-summary-trend">
+        <div className="analysis-summary-trend-header">
+          <span>관련 동향</span>
+          <strong>{trendsStatus === "idle" ? "준비 중..." : trendsStatus === "loading" ? "불러오는 중..." : trendsStatus === "ready" || trendsStatus === "empty" ? `${trends.length}건` : "확인 불가"}</strong>
+        </div>
+        {representativeTrend && <div className="analysis-summary-trend-item">
+          <small>{formatTrendDate(representativeTrend.date)}</small>
+          <strong title={representativeTrend.title ?? ""}>{representativeTrend.title ?? ""}</strong>
+        </div>}
+      </div>
     </>}
 
     {(analysis || stats || timeseries) && <>
@@ -271,7 +286,6 @@ export default function AnalysisPanel() {
         <div><span>산림손실</span><strong>{formatArea(forestLossTotal)}</strong><small>{period.start} → {period.end}년 누적</small></div>
         {isCombined && <div><span>관련 동향</span><strong>{trendsStatus === "ready" ? `${trends.length}건` : "-"}</strong><small>분석 기간 기준</small></div>}
       </div>
-
       <div className="analysis-detail-grid">
         <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
         <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 손실 {formatArea(cumulativeForestLoss)}</small></section>
