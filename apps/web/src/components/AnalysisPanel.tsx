@@ -246,6 +246,8 @@ export default function AnalysisPanel() {
     </aside> : null;
   }
   const isSummary = selectedMetric == null;
+  const isNightlight = selectedMetric === "nightlight";
+  const isForest = selectedMetric === "forest";
   const isCombined = selectedMetric === "combined";
   const representativeTrend = trendsStatus === "ready" && trends.length > 0 ? trends[0] : null;
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
@@ -280,25 +282,25 @@ export default function AnalysisPanel() {
     </>}
 
     {(analysis || stats || timeseries) && <>
-      {analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
+      {isCombined && analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
       <div className={`analysis-kpis${isCombined ? " is-integrated" : ""}`} aria-label="핵심 분석 지표">
-        <div><span>야간 불빛 변화</span><strong>{formatPercent(nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>
-        <div><span>산림손실</span><strong>{formatArea(forestLossTotal)}</strong><small>{period.start} → {period.end}년 누적</small></div>
+        {(isSummary || isNightlight || isCombined) && <div><span>야간 불빛 변화</span><strong>{formatPercent(nightlightChangePct)}</strong><small>{period.start} → {period.end}년</small></div>}
+        {(isSummary || isForest || isCombined) && <div><span>산림손실</span><strong>{formatArea(forestLossTotal)}</strong><small>{period.start} → {period.end}년 누적</small></div>}
         {isCombined && <div><span>관련 동향</span><strong>{trendsStatus === "ready" ? `${trends.length}건` : "-"}</strong><small>분석 기간 기준</small></div>}
       </div>
       <div className="analysis-detail-grid">
-        <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>
-        <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 손실 {formatArea(cumulativeForestLoss)}</small></section>
+        {(isNightlight || isCombined) && <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>}
+        {(isForest || isCombined) && <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 손실 {formatArea(cumulativeForestLoss)}</small></section>}
       </div>
 
-      {analysis && <>
+      {isCombined && analysis && <>
         {isCombined && <div className="analysis-section analysis-integrated-observation"><strong>종합 관찰</strong><span className="analysis-section-hint">기존 위성 통계와 연결된 공개 동향을 함께 정리한 내용</span><p>{integratedObservation}</p></div>}
         <div className="analysis-section analysis-observation"><strong>관찰</strong><span className="analysis-section-hint">데이터에서 직접 확인된 내용</span><p>{analysis.observation}</p></div>
         <div className="analysis-section analysis-interpretation"><strong>해석</strong><span className="analysis-section-hint">관찰 결과를 바탕으로 한 참고 의견</span><p>{analysis.interpretation}</p></div>
       </>}
-      <div className="analysis-note"><strong>주의</strong><p>{isCombined ? "위성 관측값과 관련 동향은 시설 주변 변화를 살펴보기 위한 참고 자료입니다. 단일 지표나 동향만으로 시설 운영 상태, 정책 변화, 원인을 확정할 수 없습니다." : "단일 위성지표만으로 시설 운영 여부나 변화 원인을 확정할 수 없습니다. 관련 자료와 함께 참고해주세요."}</p></div>
+      {isCombined && <div className="analysis-note"><strong>주의</strong><p>위성 관측값과 관련 동향은 시설 주변 변화를 살펴보기 위한 참고 자료입니다. 단일 지표나 동향만으로 시설 운영 상태, 정책 변화, 원인을 확정할 수 없습니다.</p></div>}
 
-      <section id="facility-related-trends" className="analysis-section analysis-trends" aria-live="polite">
+      {isCombined && <section id="facility-related-trends" className="analysis-section analysis-trends" aria-live="polite">
         <strong>관련 동향</strong>
         <span className="analysis-section-hint">위성 관측 결과와 함께 참고할 수 있는 공개 동향입니다.</span>
         {trendsStatus === "loading" && <p className="analysis-status" role="status">관련 동향을 불러오는 중...</p>}
@@ -316,17 +318,17 @@ export default function AnalysisPanel() {
           </div>
           {trends.length > 3 && <button type="button" className="analysis-trends-more" onClick={() => setShowAllTrends((value) => !value)}>{showAllTrends ? "간단히 보기" : "관련 동향 더보기"}</button>}
         </>}
-      </section>
+      </section>}
 
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         {(isCombined || selectedMetric === "nightlight") && <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />}
         {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "선택 기간에 관측된 산림손실이 없습니다." : "산림손실 데이터가 없습니다.") : undefined} />}
       </>}
 
-      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change{isCombined ? " · 관련 동향 데이터" : ""}</span></div></div>
+      <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>{isNightlight ? "시설정보 DB · NOAA VIIRS DNB" : isForest ? "시설정보 DB · Hansen Global Forest Change" : "시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change · 관련 동향 데이터"}</span></div></div>
       {isCombined && <div className="analysis-evidence-links"><strong>근거 상세보기</strong><div><button type="button" onClick={() => useAnalysisStore.getState().setMetric("nightlight")}>야간 불빛 상세 보기</button><button type="button" onClick={() => useAnalysisStore.getState().setMetric("forest")}>산림 변화 상세 보기</button><button type="button" onClick={() => document.getElementById("facility-related-trends")?.scrollIntoView({ behavior: "smooth", block: "nearest" })}>관련 동향 보기</button></div></div>}
     </>}
-    {analysisStatus === "error" && <div className="analysis-section analysis-status-error" role="alert"><strong>관찰·해석</strong><p>분석 문장을 불러오지 못했습니다. 위의 통계와 시계열을 기준으로 확인해주세요.</p></div>}
-    {analysisStatus === "empty" && <div className="analysis-section" role="status"><strong>관찰·해석</strong><p>이 시설의 분석 문장이 아직 준비되지 않았습니다.</p></div>}
+    {isCombined && analysisStatus === "error" && <div className="analysis-section analysis-status-error" role="alert"><strong>관찰·해석</strong><p>분석 문장을 불러오지 못했습니다. 위의 통계와 시계열을 기준으로 확인해주세요.</p></div>}
+    {isCombined && analysisStatus === "empty" && <div className="analysis-section" role="status"><strong>관찰·해석</strong><p>이 시설의 분석 문장이 아직 준비되지 않았습니다.</p></div>}
   </aside>;
 }
