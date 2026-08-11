@@ -184,6 +184,18 @@ header p { max-width: 760px; }
 .legend-forest .legend-bar { background: linear-gradient(90deg, #f8fafc, #facc15, #f97316, #dc2626, #7f1d1d); }
 .mode-help { margin: -4px 0 12px; color: #6b7280; font-size: 10px; line-height: 1.45; }
 .analysis-guide { margin: 9px 0 0; color: #4b5563; font-size: 12px; line-height: 1.5; }
+.analysis-panel-summary .analysis-overview,
+.analysis-panel-summary .analysis-detail-grid,
+.analysis-panel-summary .analysis-section,
+.analysis-panel-summary .analysis-note,
+.analysis-panel-summary .analysis-chart-wrap,
+.analysis-panel-summary .analysis-sources,
+.analysis-panel-summary .analysis-evidence-links,
+.analysis-panel-summary .analysis-status-error { display: none; }
+.analysis-panel-summary > .analysis-guide:not(.analysis-guide-summary) { display: none; }
+.analysis-guide-summary { margin-top: 10px; }
+.analysis-summary-trend { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; padding: 10px; background: #f3f4f6; border: 1px solid #e5e7eb; font-size: 12px; }
+.analysis-summary-trend strong { color: #0f766e; font-size: 18px; }
 .analysis-summary { margin-top: 10px; }
 .swipe-label { display: grid; gap: 1px; min-width: 64px; }
 .swipe-label small { color: #d1d5db; font-size: 10px; }

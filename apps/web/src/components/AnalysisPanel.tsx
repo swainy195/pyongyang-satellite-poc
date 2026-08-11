@@ -81,6 +81,7 @@ export default function AnalysisPanel() {
   const focus = useAnalysisStore((state) => state.focusFacility);
   const analysisPanelOpen = useAnalysisStore((state) => state.analysisPanelOpen);
   const metric = useAnalysisStore((state) => state.metric);
+  const selectedMetric = useAnalysisStore((state) => state.selectedMetric);
   const baseYear = useAnalysisStore((state) => state.baseYear);
   const compareYear = useAnalysisStore((state) => state.compareYear);
   const [facility, setFacility] = useState<FacilityDetail | null>(null);
@@ -239,9 +240,10 @@ export default function AnalysisPanel() {
       <p>시설을 선택하면 야간 불빛, 산림 변화, 관련 동향을 한 화면에서 함께 확인할 수 있습니다.</p>
     </aside> : null;
   }
-  const isCombined = metric === "combined";
+  const isSummary = selectedMetric == null;
+  const isCombined = selectedMetric === "combined";
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
-  return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}`} aria-live="polite">
+  return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}${isSummary ? " analysis-panel-summary" : ""}`} aria-live="polite">
     <div className="analysis-heading">
       <div><span className="analysis-eyebrow">{isCombined ? "종합 분석" : "선택 시설 분석"}</span><strong>{facility?.name ?? focus.name}</strong></div>
       <button type="button" onClick={() => useAnalysisStore.getState().setAnalysisPanelOpen(false)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
@@ -257,6 +259,11 @@ export default function AnalysisPanel() {
     {detailStatus === "error" && <p className="analysis-status analysis-status-error" role="alert">시설 기본정보를 불러오지 못했습니다.</p>}
 
     {(statsStatus === "loading" || statsStatus === "error" || statsStatus === "empty") && <p className={`analysis-status${statsStatus === "error" ? " analysis-status-error" : ""}`} role={statsStatus === "error" ? "alert" : "status"}>{statsStatus === "loading" ? "통계 정보를 불러오는 중..." : statsStatus === "empty" ? "이 시설의 위성 통계가 아직 준비되지 않았습니다." : "통계 정보를 불러오지 못했습니다."}</p>}
+    {isSummary && <>
+      <p className="analysis-guide analysis-guide-summary">{"\uC9C0\uB3C4\uC5D0\uC11C \uD655\uC778\uD560 \uBD84\uC11D \uD56D\uBAA9\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694."}</p>
+      <div className="analysis-summary-trend"><span>{"\uAD00\uB828 \uB3D9\uD5A5"}</span><strong>{trendsStatus === "ready" ? `${trends.length}\uAC74` : "-"}</strong></div>
+    </>}
+
     {(analysis || stats || timeseries) && <>
       {analysis && <div className="analysis-overview"><strong>핵심 변화</strong><p>{analysis.summary}</p></div>}
       <div className={`analysis-kpis${isCombined ? " is-integrated" : ""}`} aria-label="핵심 분석 지표">
@@ -298,8 +305,8 @@ export default function AnalysisPanel() {
       </section>
 
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
-        <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />
-        <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "선택 기간에 관측된 산림손실이 없습니다." : "산림손실 데이터가 없습니다.") : undefined} />
+        {(isCombined || selectedMetric === "nightlight") && <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />}
+        {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "선택 기간에 관측된 산림손실이 없습니다." : "산림손실 데이터가 없습니다.") : undefined} />}
       </>}
 
       <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change{isCombined ? " · 관련 동향 데이터" : ""}</span></div></div>
