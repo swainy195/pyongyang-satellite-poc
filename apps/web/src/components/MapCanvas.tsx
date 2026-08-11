@@ -491,6 +491,7 @@ export default function MapCanvas() {
       enabled={mode === "swipe"}
       baseYear={baseYear}
       compareYear={compareYear}
+      containerRef={container}
       positionRef={swipePositionRef}
       onPositionChange={() => map.current?.triggerRepaint()}
       onDragStart={() => map.current?.dragPan.disable()}

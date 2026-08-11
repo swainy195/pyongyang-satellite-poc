@@ -4,13 +4,14 @@ type SwipeControlProps = {
   enabled: boolean;
   baseYear: number;
   compareYear: number;
+  containerRef?: { current: HTMLElement | null };
   positionRef: { current: number };
   onPositionChange: () => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
 };
 
-export default function SwipeControl({ enabled, baseYear, compareYear, positionRef, onPositionChange, onDragStart, onDragEnd }: SwipeControlProps) {
+export default function SwipeControl({ enabled, baseYear, compareYear, containerRef, positionRef, onPositionChange, onDragStart, onDragEnd }: SwipeControlProps) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<HTMLButtonElement | null>(null);
@@ -31,9 +32,9 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
   }, [enabled, positionRef]);
 
   const updatePosition = (clientX: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const bounds = rail.getBoundingClientRect();
+    const container = containerRef?.current ?? railRef.current;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
     positionRef.current = Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width));
     syncPositionVisuals();
     onPositionChange();
@@ -56,7 +57,8 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
     updatePosition(event.clientX);
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const handlePointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!draggingRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     draggingRef.current = false;
@@ -79,8 +81,9 @@ export default function SwipeControl({ enabled, baseYear, compareYear, positionR
       title="좌우로 드래그하여 비교 위치 조절"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onLostPointerCapture={handlePointerEnd}
     >
       <span aria-hidden="true">◀ ● ▶</span>
     </button>
