@@ -362,7 +362,7 @@ export default function MapCanvas() {
       }).catch(() => undefined);
 
       satelliteInitializedRef.current = true;
-      void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends, metric, mode)
+      void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends && Boolean(useAnalysisStore.getState().focusFacility), metric, mode)
         .then(() => setSatelliteStatus("ready"))
         .catch(() => setSatelliteStatus("unavailable"));
     });
@@ -375,7 +375,7 @@ export default function MapCanvas() {
       if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
       if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
       if (map.current.getLayer("hansen-forest-loss")) map.current.setLayoutProperty("hansen-forest-loss", "visibility", "none");
-      void updateNightlightDifferenceLayer(map.current, baseYear, compareYear, showTrends, metric).catch(() => undefined);
+      void updateNightlightDifferenceLayer(map.current, baseYear, compareYear, showTrends && Boolean(focusFacility), metric).catch(() => undefined);
       return;
     }
     if (mode === "difference" && metric === "forest") {
@@ -399,7 +399,7 @@ export default function MapCanvas() {
     void updateBaseRasterLayer(map.current, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
     void updateBaseRasterLayer(map.current, "forest", baseYear, showTrends, metric).catch(() => undefined);
     applyComparisonOpacity(map.current, mode, metric);
-  }, [baseYear, compareYear, showTrends, metric, mode]);
+  }, [baseYear, compareYear, showTrends, metric, mode, focusFacility]);
   useEffect(() => {
     if (!map.current || !focusFacility) return;
     map.current.flyTo({ center: [focusFacility.longitude, focusFacility.latitude], zoom: 12, duration: 800 });
