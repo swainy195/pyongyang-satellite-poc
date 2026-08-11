@@ -4,6 +4,16 @@ import { useAnalysisStore } from "../store";
 import { apiBaseUrl } from "../api";
 import SwipeControl from "./SwipeControl";
 
+class SatelliteRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "SatelliteRequestError";
+    this.status = status;
+  }
+}
+
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -29,7 +39,7 @@ async function updateNightlightLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/nightlight/${year}`);
-  if (!response.ok) throw new Error(`VIIRS tile metadata HTTP ${response.status}`);
+  if (!response.ok) throw new SatelliteRequestError(`VIIRS tile metadata HTTP ${response.status}`, response.status);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "viirs-nightlight-source";
   const source = map.getSource(sourceId);
@@ -62,7 +72,7 @@ async function updateNightlightDifferenceLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/nightlight/difference?base_year=${baseYear}&compare_year=${compareYear}`);
-  if (!response.ok) throw new Error(`VIIRS difference tile metadata HTTP ${response.status}`);
+  if (!response.ok) throw new SatelliteRequestError(`VIIRS difference tile metadata HTTP ${response.status}`, response.status);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "viirs-nightlight-difference-source";
   const source = map.getSource(sourceId);
@@ -90,7 +100,7 @@ async function updateForestLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/forest/${year}`);
-  if (!response.ok) throw new Error(`Hansen tile metadata HTTP ${response.status}`);
+  if (!response.ok) throw new SatelliteRequestError(`Hansen tile metadata HTTP ${response.status}`, response.status);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "hansen-forest-source";
   const source = map.getSource(sourceId);
@@ -123,7 +133,7 @@ async function updateForestPeriodLayer(
   }
 
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/forest/period?start_year=${startYear}&end_year=${endYear}`);
-  if (!response.ok) throw new Error(`Hansen period tile metadata HTTP ${response.status}`);
+  if (!response.ok) throw new SatelliteRequestError(`Hansen period tile metadata HTTP ${response.status}`, response.status);
   const payload = await response.json() as { tiles: string[] };
   const sourceId = "hansen-forest-source";
   const source = map.getSource(sourceId);
@@ -157,7 +167,7 @@ async function updateBaseRasterLayer(
     return;
   }
   const response = await fetch(`${apiBaseUrl}/api/v1/map/tiles/${isNightlight ? "nightlight" : "forest"}/${year}`);
-  if (!response.ok) throw new Error(`${type} tile metadata HTTP ${response.status}`);
+  if (!response.ok) throw new SatelliteRequestError(`${type} tile metadata HTTP ${response.status}`, response.status);
   const payload = await response.json() as { tiles: string[] };
   const source = map.getSource(sourceId);
   if (source && "setTiles" in source) {
@@ -233,19 +243,13 @@ function createSwipeClipLayer(
 }
 
 async function waitForBackend() {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 45_000);
-    try {
-      const response = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
-      if (!response.ok) throw new Error(`Backend health HTTP ${response.status}`);
-      return;
-    } catch (error) {
-      if (attempt === 1) throw error;
-      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 45_000);
+  try {
+    const response = await fetch(`${apiBaseUrl}/health`, { signal: controller.signal });
+    if (!response.ok) throw new SatelliteRequestError(`Backend health HTTP ${response.status}`, response.status);
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -260,29 +264,45 @@ async function prepareSatelliteLayers(
 ) {
   if (!hasFocusedFacility) return;
   await waitForBackend();
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  if (mode === "difference" && metric === "nightlight") {
+    await updateNightlightDifferenceLayer(map, baseYear, compareYear, showTrends, metric);
+    applyComparisonOpacity(map, mode, metric);
+    return;
+  }
+  if (mode === "difference" && metric === "forest") {
+    await updateForestPeriodLayer(map, baseYear, compareYear, showTrends, metric);
+    applyComparisonOpacity(map, mode, metric);
+    return;
+  }
+  await Promise.all([
+    updateBaseRasterLayer(map, "nightlight", baseYear, showTrends, metric),
+    updateBaseRasterLayer(map, "forest", baseYear, showTrends, metric),
+    updateNightlightLayer(map, compareYear, showTrends, metric),
+    updateForestLayer(map, compareYear, showTrends, metric),
+  ]);
+  applyComparisonOpacity(map, mode, metric);
+}
+
+function isRetryableSatelliteError(error: unknown) {
+  if (error instanceof SatelliteRequestError) return error.status >= 500 && error.status <= 599;
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  return true;
+}
+
+async function retrySatelliteLoad(
+  task: () => Promise<void>,
+  onRetry: (attempt: number, total: number) => void,
+) {
+  const totalAttempts = 3;
+  const delays = [1_500, 3_000];
+  for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
     try {
-      if (mode === "difference" && metric === "nightlight") {
-        await updateNightlightDifferenceLayer(map, baseYear, compareYear, showTrends, metric);
-        applyComparisonOpacity(map, mode, metric);
-        return;
-      }
-      if (mode === "difference" && metric === "forest") {
-        await updateForestPeriodLayer(map, baseYear, compareYear, showTrends, metric);
-        applyComparisonOpacity(map, mode, metric);
-        return;
-      }
-      await Promise.all([
-        updateBaseRasterLayer(map, "nightlight", baseYear, showTrends, metric),
-        updateBaseRasterLayer(map, "forest", baseYear, showTrends, metric),
-        updateNightlightLayer(map, compareYear, showTrends, metric),
-        updateForestLayer(map, compareYear, showTrends, metric),
-      ]);
-      applyComparisonOpacity(map, mode, metric);
+      await task();
       return;
     } catch (error) {
-      if (attempt === 1) throw error;
-      await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+      if (!isRetryableSatelliteError(error) || attempt === totalAttempts) throw error;
+      onRetry(attempt + 1, totalAttempts);
+      await new Promise((resolve) => window.setTimeout(resolve, delays[attempt - 1]));
     }
   }
 }
@@ -293,10 +313,43 @@ export default function MapCanvas() {
   const map = useRef<maplibregl.Map | null>(null);
   const satelliteInitializedRef = useRef(false);
   const satelliteRequestRef = useRef(0);
-  const [satelliteStatus, setSatelliteStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const [satelliteStatus, setSatelliteStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "unavailable">("idle");
+  const [satelliteRetryAttempt, setSatelliteRetryAttempt] = useState(0);
   const swipePositionRef = useRef(0.5);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const startSatelliteLoad = (currentMap: maplibregl.Map) => {
+    const currentState = useAnalysisStore.getState();
+    if (!currentState.focusFacility || !currentState.selectedMetric) {
+      hideSatelliteLayers(currentMap);
+      setSatelliteStatus("idle");
+      return;
+    }
+    const requestId = ++satelliteRequestRef.current;
+    setSatelliteStatus("loading");
+    setSatelliteRetryAttempt(0);
+    hideSatelliteLayers(currentMap);
+    void retrySatelliteLoad(
+      () => prepareSatelliteLayers(currentMap, currentState.baseYear, currentState.compareYear, currentState.showTrends, currentState.metric, currentState.mode, true),
+      (attempt, total) => {
+        if (requestId !== satelliteRequestRef.current) return;
+        setSatelliteRetryAttempt(attempt);
+        setSatelliteStatus("retrying");
+      },
+    )
+      .then(() => {
+        const latestState = useAnalysisStore.getState();
+        if (requestId !== satelliteRequestRef.current || !latestState.focusFacility || !latestState.selectedMetric) {
+          hideSatelliteLayers(currentMap);
+          setSatelliteStatus("idle");
+          return;
+        }
+        setSatelliteStatus("ready");
+      })
+      .catch(() => {
+        if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+      });
+  };
   useEffect(() => {
     if (!container.current || map.current) return;
     map.current = new maplibregl.Map({
@@ -379,20 +432,7 @@ export default function MapCanvas() {
       satelliteInitializedRef.current = true;
       const initialState = useAnalysisStore.getState();
       if (initialState.focusFacility && initialState.selectedMetric) {
-        setSatelliteStatus("loading");
-        const requestId = ++satelliteRequestRef.current;
-        void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends, metric, mode, true)
-          .then(() => {
-            if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
-              hideSatelliteLayers(currentMap);
-              setSatelliteStatus("idle");
-              return;
-            }
-            setSatelliteStatus("ready");
-          })
-          .catch(() => {
-            if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
-          });
+        startSatelliteLoad(currentMap);
       }
     });
     return () => { map.current?.remove(); map.current = null; };
@@ -400,82 +440,12 @@ export default function MapCanvas() {
   useEffect(() => {
     if (!map.current?.isStyleLoaded() || !satelliteInitializedRef.current) return;
     const currentMap = map.current;
-    const requestId = ++satelliteRequestRef.current;
     if (!focusFacility || !selectedMetric) {
       hideSatelliteLayers(currentMap);
       setSatelliteStatus("idle");
       return;
     }
-    setSatelliteStatus("loading");
-    if (mode === "difference" && metric === "nightlight") {
-      hideSatelliteLayers(currentMap);
-      void updateNightlightDifferenceLayer(currentMap, baseYear, compareYear, showTrends, metric)
-        .then(() => {
-          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
-            hideSatelliteLayers(currentMap);
-            setSatelliteStatus("idle");
-            return;
-          }
-          setSatelliteStatus("ready");
-        })
-        .catch(() => {
-          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
-        });
-      return;
-    }
-    if (mode === "difference" && metric === "forest") {
-      hideSatelliteLayers(currentMap);
-      void updateForestPeriodLayer(currentMap, baseYear, compareYear, showTrends, metric)
-        .then(() => {
-          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
-            hideSatelliteLayers(currentMap);
-            setSatelliteStatus("idle");
-            return;
-          }
-          setSatelliteStatus("ready");
-        })
-        .catch(() => {
-          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
-        });
-      applyComparisonOpacity(map.current, mode, metric);
-      return;
-    }
-    if (mode === "timeline" && metric === "forest") {
-      hideSatelliteLayers(currentMap);
-      void updateForestLayer(currentMap, compareYear, showTrends, metric)
-        .then(() => {
-          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
-            hideSatelliteLayers(currentMap);
-            setSatelliteStatus("idle");
-            return;
-          }
-          setSatelliteStatus("ready");
-        })
-        .catch(() => {
-          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
-        });
-      applyComparisonOpacity(map.current, mode, metric);
-      return;
-    }
-    hideSatelliteLayers(currentMap);
-    void Promise.all([
-      updateNightlightLayer(currentMap, compareYear, showTrends, metric),
-      updateForestLayer(currentMap, compareYear, showTrends, metric),
-      updateBaseRasterLayer(currentMap, "nightlight", baseYear, showTrends, metric),
-      updateBaseRasterLayer(currentMap, "forest", baseYear, showTrends, metric),
-    ])
-      .then(() => {
-        if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
-          hideSatelliteLayers(currentMap);
-          setSatelliteStatus("idle");
-          return;
-        }
-        setSatelliteStatus("ready");
-      })
-      .catch(() => {
-        if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
-      });
-    applyComparisonOpacity(map.current, mode, metric);
+    startSatelliteLoad(currentMap);
   }, [baseYear, compareYear, showTrends, metric, mode, focusFacility, selectedMetric]);
   useEffect(() => {
     if (!map.current || !focusFacility) return;
@@ -511,7 +481,10 @@ export default function MapCanvas() {
       <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
         {satelliteStatus === "loading"
           ? "위성 레이어 준비 중..."
-          : "위성 레이어를 불러오지 못했습니다."}
+          : satelliteStatus === "retrying"
+            ? `위성 레이어를 다시 불러오는 중... (${satelliteRetryAttempt}/3)`
+            : "위성 레이어를 불러오지 못했습니다."}
+        {satelliteStatus === "unavailable" && <button type="button" onClick={() => { if (map.current) startSatelliteLoad(map.current); }}>다시 시도</button>}
       </div>
     )}
     <SwipeControl
