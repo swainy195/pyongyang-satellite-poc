@@ -16,6 +16,7 @@ interface AnalysisState {
   setYears: (baseYear: number, compareYear: number) => void;
   setLayerVisible: (layer: "boundaries" | "facilities" | "trends", visible: boolean) => void;
   setFocusFacility: (facility: AnalysisState["focusFacility"]) => void;
+  selectMetric: (metric: Metric) => void;
 }
 export const useAnalysisStore = create<AnalysisState>((set) => ({
   metric: "nightlight",
@@ -28,6 +29,9 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   showTrends: true,
   focusFacility: null,
   setMetric: (metric) => set((state) => ({ metric, selectedMetric: state.focusFacility ? metric : null })),
+  selectMetric: (metric) => set((state) => state.focusFacility
+    ? { metric, selectedMetric: metric, mode: "difference" }
+    : { metric, selectedMetric: null }),
   setMode: (mode) => set({ mode }),
   setYears: (baseYear, compareYear) => set({ baseYear, compareYear }),
   setLayerVisible: (layer, visible) => {
@@ -35,6 +39,6 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
     set({ [key]: visible });
   },
   setFocusFacility: (facility) => set(facility
-    ? { focusFacility: facility, metric: "nightlight", selectedMetric: "nightlight", mode: "difference" }
+    ? { focusFacility: facility, selectedMetric: null }
     : { focusFacility: null, selectedMetric: null }),
 }));

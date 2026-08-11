@@ -288,7 +288,7 @@ async function prepareSatelliteLayers(
 }
 
 export default function MapCanvas() {
-  const { showBoundaries, showFacilities, showTrends, baseYear, compareYear, metric, mode, focusFacility } = useAnalysisStore();
+  const { showBoundaries, showFacilities, showTrends, baseYear, compareYear, metric, mode, focusFacility, selectedMetric } = useAnalysisStore();
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const satelliteInitializedRef = useRef(false);
@@ -378,7 +378,7 @@ export default function MapCanvas() {
 
       satelliteInitializedRef.current = true;
       const initialState = useAnalysisStore.getState();
-      if (initialState.focusFacility) {
+      if (initialState.focusFacility && initialState.selectedMetric) {
         setSatelliteStatus("loading");
         const requestId = ++satelliteRequestRef.current;
         void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends, metric, mode, true)
@@ -401,7 +401,7 @@ export default function MapCanvas() {
     if (!map.current?.isStyleLoaded() || !satelliteInitializedRef.current) return;
     const currentMap = map.current;
     const requestId = ++satelliteRequestRef.current;
-    if (!focusFacility) {
+    if (!focusFacility || !selectedMetric) {
       hideSatelliteLayers(currentMap);
       setSatelliteStatus("idle");
       return;
@@ -476,7 +476,7 @@ export default function MapCanvas() {
         if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
       });
     applyComparisonOpacity(map.current, mode, metric);
-  }, [baseYear, compareYear, showTrends, metric, mode, focusFacility]);
+  }, [baseYear, compareYear, showTrends, metric, mode, focusFacility, selectedMetric]);
   useEffect(() => {
     if (!map.current || !focusFacility) return;
     map.current.flyTo({ center: [focusFacility.longitude, focusFacility.latitude], zoom: 12, duration: 800 });
@@ -507,7 +507,7 @@ export default function MapCanvas() {
   }, [focusFacility, metric, mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
-    {focusFacility && satelliteStatus !== "ready" && (
+    {focusFacility && selectedMetric && satelliteStatus !== "ready" && (
       <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
         {satelliteStatus === "loading"
           ? "위성 레이어 준비 중..."
