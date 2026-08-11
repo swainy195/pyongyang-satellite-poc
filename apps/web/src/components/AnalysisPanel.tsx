@@ -52,24 +52,22 @@ function SeriesChart({
   color,
   label,
   unit,
+  hideZeroBars = false,
 }: {
   points: Array<{ year: number; value: number | null | undefined }>;
   value: (point: { year: number; value: number | null | undefined }) => number;
   color: string;
   label: string;
   unit: string;
+  hideZeroBars?: boolean;
 }) {
-  const values = points.map((point) => {
-    const numericValue = Number(value(point));
-    return Number.isFinite(numericValue) ? numericValue : 0;
-  });
-  const max = Math.max(...values, 0);
+  const max = Math.max(...points.map(value), 0);
   const scale = max > 0 ? max : 1;
   return <div className="analysis-chart-wrap">
     <strong className="analysis-chart-title">{label}</strong>
     <div className="analysis-chart" role="img" aria-label={`${label} 그래프`}>
       {points.map((point) => <div className="analysis-bar" key={point.year} title={`${point.year}년 · ${formatValue(point.value)}${unit}`} aria-label={`${point.year}년, ${formatValue(point.value)}${unit}`}>
-        <i style={{ height: `${values[points.indexOf(point)] > 0 ? Math.max(3, values[points.indexOf(point)] / scale * 100) : 0}%`, background: color }} />
+        {(!hideZeroBars || (point.value != null && value(point) > 0)) && <i style={{ height: `${Math.max(point.value == null ? 0 : 3, value(point) / scale * 100)}%`, background: color }} />}
         <small>{point.year}</small>
       </div>)}
     </div>
@@ -297,7 +295,7 @@ export default function AnalysisPanel() {
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />
         {!hasObservedForestLoss && hasForestObservations && <p className="analysis-chart-empty">선택 기간에 관측된 산림손실이 없습니다.</p>}
-        <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" />
+        <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars />
       </>}
 
       <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change{isCombined ? " · 관련 동향 데이터" : ""}</span></div></div>
