@@ -191,6 +191,18 @@ function applyFacilityVisualPriority(map: maplibregl.Map, metric: string, mode: 
   map.setPaintProperty("facilities-points", "circle-opacity", metric === "combined" ? 0.72 : mode === "difference" ? 0.28 : metric === "forest" ? 0.4 : 0.32);
 }
 
+function hideSatelliteLayers(map: maplibregl.Map) {
+  for (const layerId of [
+    "viirs-nightlight-difference",
+    "viirs-nightlight",
+    "viirs-nightlight-base",
+    "hansen-forest-loss",
+    "hansen-forest-base",
+  ]) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", "none");
+  }
+}
+
 function createSwipeClipLayer(
   id: string,
   side: "left" | "right" | null,
@@ -244,7 +256,9 @@ async function prepareSatelliteLayers(
   showTrends: boolean,
   metric: string,
   mode: string,
+  hasFocusedFacility: boolean,
 ) {
+  if (!hasFocusedFacility) return;
   await waitForBackend();
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -278,7 +292,8 @@ export default function MapCanvas() {
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const satelliteInitializedRef = useRef(false);
-  const [satelliteStatus, setSatelliteStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const satelliteRequestRef = useRef(0);
+  const [satelliteStatus, setSatelliteStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const swipePositionRef = useRef(0.5);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -362,42 +377,104 @@ export default function MapCanvas() {
       }).catch(() => undefined);
 
       satelliteInitializedRef.current = true;
-      void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends && Boolean(useAnalysisStore.getState().focusFacility), metric, mode)
-        .then(() => setSatelliteStatus("ready"))
-        .catch(() => setSatelliteStatus("unavailable"));
+      const initialState = useAnalysisStore.getState();
+      if (initialState.focusFacility) {
+        setSatelliteStatus("loading");
+        const requestId = ++satelliteRequestRef.current;
+        void prepareSatelliteLayers(currentMap, baseYear, compareYear, showTrends, metric, mode, true)
+          .then(() => {
+            if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
+              hideSatelliteLayers(currentMap);
+              setSatelliteStatus("idle");
+              return;
+            }
+            setSatelliteStatus("ready");
+          })
+          .catch(() => {
+            if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+          });
+      }
     });
     return () => { map.current?.remove(); map.current = null; };
   }, []);
   useEffect(() => {
     if (!map.current?.isStyleLoaded() || !satelliteInitializedRef.current) return;
+    const currentMap = map.current;
+    const requestId = ++satelliteRequestRef.current;
+    if (!focusFacility) {
+      hideSatelliteLayers(currentMap);
+      setSatelliteStatus("idle");
+      return;
+    }
+    setSatelliteStatus("loading");
     if (mode === "difference" && metric === "nightlight") {
-      if (map.current.getLayer("viirs-nightlight-base")) map.current.setLayoutProperty("viirs-nightlight-base", "visibility", "none");
-      if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
-      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
-      if (map.current.getLayer("hansen-forest-loss")) map.current.setLayoutProperty("hansen-forest-loss", "visibility", "none");
-      void updateNightlightDifferenceLayer(map.current, baseYear, compareYear, showTrends && Boolean(focusFacility), metric).catch(() => undefined);
+      hideSatelliteLayers(currentMap);
+      void updateNightlightDifferenceLayer(currentMap, baseYear, compareYear, showTrends, metric)
+        .then(() => {
+          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
+            hideSatelliteLayers(currentMap);
+            setSatelliteStatus("idle");
+            return;
+          }
+          setSatelliteStatus("ready");
+        })
+        .catch(() => {
+          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+        });
       return;
     }
     if (mode === "difference" && metric === "forest") {
-      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
-      if (map.current.getLayer("viirs-nightlight-base")) map.current.setLayoutProperty("viirs-nightlight-base", "visibility", "none");
-      if (map.current.getLayer("viirs-nightlight")) map.current.setLayoutProperty("viirs-nightlight", "visibility", "none");
-      if (map.current.getLayer("viirs-nightlight-difference")) map.current.setLayoutProperty("viirs-nightlight-difference", "visibility", "none");
-      void updateForestPeriodLayer(map.current, baseYear, compareYear, showTrends, metric).catch(() => undefined);
+      hideSatelliteLayers(currentMap);
+      void updateForestPeriodLayer(currentMap, baseYear, compareYear, showTrends, metric)
+        .then(() => {
+          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
+            hideSatelliteLayers(currentMap);
+            setSatelliteStatus("idle");
+            return;
+          }
+          setSatelliteStatus("ready");
+        })
+        .catch(() => {
+          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+        });
       applyComparisonOpacity(map.current, mode, metric);
       return;
     }
     if (mode === "timeline" && metric === "forest") {
-      if (map.current.getLayer("hansen-forest-base")) map.current.setLayoutProperty("hansen-forest-base", "visibility", "none");
-      void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
+      hideSatelliteLayers(currentMap);
+      void updateForestLayer(currentMap, compareYear, showTrends, metric)
+        .then(() => {
+          if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
+            hideSatelliteLayers(currentMap);
+            setSatelliteStatus("idle");
+            return;
+          }
+          setSatelliteStatus("ready");
+        })
+        .catch(() => {
+          if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+        });
       applyComparisonOpacity(map.current, mode, metric);
       return;
     }
-    if (map.current.getLayer("viirs-nightlight-difference")) map.current.setLayoutProperty("viirs-nightlight-difference", "visibility", "none");
-    void updateNightlightLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
-    void updateForestLayer(map.current, compareYear, showTrends, metric).catch(() => undefined);
-    void updateBaseRasterLayer(map.current, "nightlight", baseYear, showTrends, metric).catch(() => undefined);
-    void updateBaseRasterLayer(map.current, "forest", baseYear, showTrends, metric).catch(() => undefined);
+    hideSatelliteLayers(currentMap);
+    void Promise.all([
+      updateNightlightLayer(currentMap, compareYear, showTrends, metric),
+      updateForestLayer(currentMap, compareYear, showTrends, metric),
+      updateBaseRasterLayer(currentMap, "nightlight", baseYear, showTrends, metric),
+      updateBaseRasterLayer(currentMap, "forest", baseYear, showTrends, metric),
+    ])
+      .then(() => {
+        if (requestId !== satelliteRequestRef.current || !useAnalysisStore.getState().focusFacility) {
+          hideSatelliteLayers(currentMap);
+          setSatelliteStatus("idle");
+          return;
+        }
+        setSatelliteStatus("ready");
+      })
+      .catch(() => {
+        if (requestId === satelliteRequestRef.current && useAnalysisStore.getState().focusFacility) setSatelliteStatus("unavailable");
+      });
     applyComparisonOpacity(map.current, mode, metric);
   }, [baseYear, compareYear, showTrends, metric, mode, focusFacility]);
   useEffect(() => {
@@ -430,7 +507,7 @@ export default function MapCanvas() {
   }, [focusFacility, metric, mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
-    {satelliteStatus !== "ready" && (
+    {focusFacility && satelliteStatus !== "ready" && (
       <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
         {satelliteStatus === "loading"
           ? "위성 레이어 준비 중..."
