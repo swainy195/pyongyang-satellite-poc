@@ -35,6 +35,7 @@ export default function LayerPanel() {
   const [searchError, setSearchError] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
   const requestIdRef = useRef(0);
+  const hasActiveAnalysis = state.focusFacility != null && state.selectedMetric != null;
   const selectMetric = (metric: Metric) => {
     state.selectMetric(metric);
     if (state.focusFacility) state.setAnalysisPanelOpen(true);
@@ -128,7 +129,7 @@ export default function LayerPanel() {
           <div className="mode-selection">
             <h4>어떻게 볼까요?</h4>
             <div className="mode-cards" role="group" aria-label="비교 방식 선택">
-              {(state.metric === "forest" ? forestModeOptions : modeOptions).map((option) => <button key={option.value} type="button" className={`mode-card mode-${option.value}${state.mode === option.value ? " is-selected" : ""}`} aria-pressed={state.mode === option.value} onClick={() => state.setMode(option.value)}>
+              {(state.metric === "forest" ? forestModeOptions : modeOptions).map((option) => <button key={option.value} type="button" className={`mode-card mode-${option.value}${hasActiveAnalysis && state.mode === option.value ? " is-selected" : ""}`} aria-pressed={hasActiveAnalysis && state.mode === option.value} onClick={() => state.setMode(option.value)}>
                 <strong>{option.title}</strong><span>{option.description}</span>
               </button>)}
             </div>
