@@ -51,6 +51,52 @@ function formatTrendDate(value: string | null | undefined) {
   return value.slice(0, 10).replaceAll("-", ".");
 }
 
+const RETRY_DELAYS = [1_000, 2_000];
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
+function waitForRetry(delay: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new DOMException("Request aborted", "AbortError"));
+    };
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  signal: AbortSignal,
+  onRetry: () => void,
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (signal.aborted) throw new DOMException("Request aborted", "AbortError");
+    const timeoutController = new AbortController();
+    const abortTimeout = () => timeoutController.abort();
+    const timeoutId = window.setTimeout(abortTimeout, 15_000);
+    signal.addEventListener("abort", abortTimeout, { once: true });
+    try {
+      const response = await fetch(input, { ...init, signal: timeoutController.signal });
+      if (!RETRYABLE_STATUSES.has(response.status) || attempt === 2) return response;
+      onRetry();
+    } catch (error) {
+      if (signal.aborted) throw new DOMException("Request aborted", "AbortError");
+      if (attempt === 2) throw error;
+      onRetry();
+    } finally {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener("abort", abortTimeout);
+    }
+    await waitForRetry(RETRY_DELAYS[attempt], signal);
+  }
+  throw new Error("Request retry limit exceeded");
+}
+
 function SeriesChart({
   points,
   value,
@@ -93,14 +139,16 @@ export default function AnalysisPanel() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [timeseries, setTimeseries] = useState<Timeseries | null>(null);
-  const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [statsStatus, setStatsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
-  const [timeseriesStatus, setTimeseriesStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
-  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "error">("idle");
+  const [statsStatus, setStatsStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "empty" | "error">("idle");
+  const [timeseriesStatus, setTimeseriesStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "empty" | "error">("idle");
+  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "empty" | "error">("idle");
   const [trends, setTrends] = useState<RelatedTrend[]>([]);
-  const [trendsStatus, setTrendsStatus] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
+  const [trendsStatus, setTrendsStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "empty" | "error">("idle");
   const [showAllTrends, setShowAllTrends] = useState(false);
   const analysisRequestId = useRef(0);
+  const lazyRequestId = useRef(0);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     const requestId = ++analysisRequestId.current;
@@ -109,33 +157,40 @@ export default function AnalysisPanel() {
       setAnalysis(null);
       setStats(null);
       setTimeseries(null);
+      setTrends([]);
       setDetailStatus("idle");
       setStatsStatus("idle");
       setTimeseriesStatus("idle");
       setAnalysisStatus("idle");
+      setTrendsStatus("idle");
       return;
     }
 
     const detailController = new AbortController();
     const statsController = new AbortController();
-    const timeseriesController = new AbortController();
-    const analysisController = new AbortController();
+    const trendsController = new AbortController();
     setFacility({ name: focus.name, category: focus.category, address: focus.address, longitude: focus.longitude, latitude: focus.latitude });
     setAnalysis(null);
+    setStats(null);
+    setTimeseries(null);
+    setTrends([]);
     setDetailStatus("loading");
     setStatsStatus("loading");
-    setTimeseriesStatus("loading");
-    setAnalysisStatus("loading");
+    setTimeseriesStatus("idle");
+    setAnalysisStatus("idle");
+    setTrendsStatus("loading");
+    setShowAllTrends(false);
 
     const handleResponse = async <T,>(
       label: string,
-      request: Promise<Response>,
+      request: RequestInfo | URL,
       controller: AbortController,
       onSuccess: (value: T) => void,
       onStatus: (status: "ready" | "empty" | "error") => void,
+      setRetrying: () => void,
     ) => {
       try {
-        const response = await request;
+        const response = await fetchWithRetry(request, {}, controller.signal, setRetrying);
         if (response.status === 422) {
           onStatus("empty");
           return;
@@ -152,74 +207,75 @@ export default function AnalysisPanel() {
 
     void handleResponse<{ facility: FacilityDetail }>(
       "Facility detail",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}`, { signal: detailController.signal }),
+      `${apiBaseUrl}/api/v1/facilities/${focus.id}`,
       detailController,
       (value) => setFacility(value.facility),
       (value) => setDetailStatus(value === "empty" ? "error" : value),
+      () => setDetailStatus("retrying"),
     );
     void handleResponse<Stats>(
       "Facility stats",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=${baseYear}&end_year=${compareYear}`, { signal: statsController.signal }),
+      `${apiBaseUrl}/api/v1/facilities/${focus.id}/stats?start_year=${baseYear}&end_year=${compareYear}`,
       statsController,
       setStats,
       (value) => setStatsStatus(value),
+      () => setStatsStatus("retrying"),
     );
-    void handleResponse<Timeseries>(
-      "Facility timeseries",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=${baseYear}&end_year=${compareYear}`, { signal: timeseriesController.signal }),
-      timeseriesController,
-      setTimeseries,
-      (value) => setTimeseriesStatus(value),
-    );
-    void handleResponse<Analysis>(
-      "Facility analysis",
-      fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=${baseYear}&end_year=${compareYear}`, { signal: analysisController.signal }),
-      analysisController,
-      setAnalysis,
-      (value) => setAnalysisStatus(value),
+    void handleResponse<{ items?: RelatedTrend[] }>(
+      "Facility related trends",
+      `${apiBaseUrl}/api/v1/facilities/${focus.id}/trends?start_year=${baseYear}&end_year=${compareYear}&limit=5`,
+      trendsController,
+      (value) => {
+        const items = value.items ?? [];
+        setTrends(items);
+        setTrendsStatus(items.length > 0 ? "ready" : "empty");
+      },
+      () => undefined,
+      () => setTrendsStatus("retrying"),
     );
 
     return () => {
       detailController.abort();
       statsController.abort();
-      timeseriesController.abort();
-      analysisController.abort();
+      trendsController.abort();
     };
-  }, [focus, baseYear, compareYear]);
+  }, [focus, baseYear, compareYear, retryNonce]);
 
   useEffect(() => {
-    if (!focus) {
-      setTrends([]);
-      setTrendsStatus("idle");
-      setShowAllTrends(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    setTrends([]);
-    setTrendsStatus("loading");
-    setShowAllTrends(false);
-
-    fetch(`${apiBaseUrl}/api/v1/facilities/${focus.id}/trends?start_year=${baseYear}&end_year=${compareYear}&limit=5`, { signal: controller.signal })
-      .then(async (response) => {
-        if (response.status === 422) return { items: [] as RelatedTrend[] };
+    const requestId = ++lazyRequestId.current;
+    if (!focus) return;
+    const controllers: AbortController[] = [];
+    const isCurrent = () => !controllers[0]?.signal.aborted && lazyRequestId.current === requestId;
+    const handleLazyResponse = async <T,>(label: string, url: string, setValue: (value: T) => void, setStatus: (status: "ready" | "empty" | "error") => void, setRetrying: () => void) => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      try {
+        const response = await fetchWithRetry(url, {}, controller.signal, setRetrying);
+        if (response.status === 422) { if (isCurrent()) setStatus("empty"); return; }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json() as { items?: RelatedTrend[] };
-      })
-      .then((value) => {
-        if (controller.signal.aborted) return;
-        const items = value.items ?? [];
-        setTrends(items);
-        setTrendsStatus(items.length > 0 ? "ready" : "empty");
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        console.error("Facility related trends request failed:", error);
-        setTrendsStatus("error");
-      });
-
-    return () => controller.abort();
-  }, [focus, baseYear, compareYear]);
+        if (isCurrent()) { setValue(await response.json() as T); setStatus("ready"); }
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error(`${label} request failed:`, error);
+        setStatus("error");
+      }
+    };
+    if (selectedMetric === "nightlight" || selectedMetric === "forest") {
+      setTimeseries(null);
+      setTimeseriesStatus("loading");
+      void handleLazyResponse<Timeseries>("Facility timeseries", `${apiBaseUrl}/api/v1/facilities/${focus.id}/timeseries?start_year=${baseYear}&end_year=${compareYear}`, setTimeseries, setTimeseriesStatus, () => setTimeseriesStatus("retrying"));
+    } else {
+      setTimeseriesStatus("idle");
+    }
+    if (selectedMetric === "combined") {
+      setAnalysis(null);
+      setAnalysisStatus("loading");
+      void handleLazyResponse<Analysis>("Facility analysis", `${apiBaseUrl}/api/v1/facilities/${focus.id}/analysis?start_year=${baseYear}&end_year=${compareYear}`, setAnalysis, setAnalysisStatus, () => setAnalysisStatus("retrying"));
+    } else {
+      setAnalysisStatus("idle");
+    }
+    return () => controllers.forEach((controller) => controller.abort());
+  }, [focus, baseYear, compareYear, selectedMetric, retryNonce]);
 
   const nightlightPoints: NightlightPoint[] = stats?.nightlight ?? analysis?.series.nightlight ?? timeseries?.series.map((point) => ({ year: point.year, mean_radiance: point.nightlight })) ?? [];
   const forestPoints: ForestPoint[] = stats?.forest ?? analysis?.series.forest ?? timeseries?.series.map((point) => ({ year: point.year, annual_loss_km2: point.forestLossKm2, cumulative_loss_km2: null })) ?? [];
@@ -252,8 +308,12 @@ export default function AnalysisPanel() {
   const isForest = selectedMetric === "forest";
   const isCombined = selectedMetric === "combined";
   const representativeTrend = trendsStatus === "ready" && trends.length > 0 ? trends[0] : null;
+  const retryData = () => setRetryNonce((value) => value + 1);
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
   return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}${isSummary ? " analysis-panel-summary" : ""}`} aria-live="polite">
+    {detailStatus === "retrying" || statsStatus === "retrying" || trendsStatus === "retrying" || timeseriesStatus === "retrying" || analysisStatus === "retrying" ? <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p> : null}
+    {detailStatus === "loading" ? <p className="analysis-status" role="status">시설 정보를 불러오는 중...</p> : null}
+    {detailStatus === "error" || statsStatus === "error" || trendsStatus === "error" || timeseriesStatus === "error" || analysisStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">일부 정보를 불러오지 못했습니다. <button type="button" onClick={retryData}>다시 시도</button></p> : null}
     <div className="analysis-heading">
       <div><span className="analysis-eyebrow">{isCombined ? "종합 분석" : "선택 시설 분석"}</span><strong>{facility?.name ?? focus.name}</strong></div>
       <button type="button" onClick={() => useAnalysisStore.getState().setAnalysisPanelOpen(false)} aria-label="분석 패널 닫기" title="분석 패널 닫기">×</button>
@@ -330,7 +390,9 @@ export default function AnalysisPanel() {
         </>}
       </section>}
 
-      {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
+      {timeseriesStatus === "retrying" && <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p>}
+      {analysisStatus === "retrying" && <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p>}
+      {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">일부 정보를 불러오지 못했습니다. <button type="button" onClick={retryData}>다시 시도</button></p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         {(isCombined || selectedMetric === "nightlight") && <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />}
         {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "산림손실이 관측되지 않았습니다." : "산림 변화 데이터가 없습니다.") : undefined} />}
       </>}
