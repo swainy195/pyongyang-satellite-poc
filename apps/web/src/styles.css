@@ -37,6 +37,7 @@ fieldset { border: 1px solid #d1d5db; border-radius: 6px; margin: 4px 0 12px; } 
 .analysis-facility-meta span:first-child { color: #1d4ed8; font-weight: 700; }
 .analysis-facility-meta small { color: #9ca3af; font-size: 10px; }
 .analysis-status { margin: 14px 0 0; color: #4b5563; font-size: 12px; }
+.analysis-status-retry { padding: 8px 10px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: 13px; font-weight: 600; }
 .analysis-status-error { color: #b91c1c; }
 .analysis-summary { margin: 14px 0; line-height: 1.55; font-size: 13px; color: #374151; }
 .analysis-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }

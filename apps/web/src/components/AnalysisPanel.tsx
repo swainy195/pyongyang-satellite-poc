@@ -311,7 +311,7 @@ export default function AnalysisPanel() {
   const retryData = () => setRetryNonce((value) => value + 1);
   const integratedObservation = `분석 기간 동안 시설 주변의 야간 불빛 변화와 산림 상태를 함께 확인할 수 있습니다. ${forestLossTotal === 0 ? "같은 기간 산림손실은 관측되지 않았습니다." : forestLossTotal == null ? "산림 변화 데이터는 확인이 필요합니다." : "같은 기간 일부 산림손실이 관측되었습니다."} ${trendsStatus === "ready" ? "연결된 공개 동향도 함께 참고할 수 있습니다." : "관련 동향은 별도 자료로 확인할 수 있습니다."}`;
   return <aside className={`analysis-panel${isCombined ? " analysis-panel-integrated" : ""}${isSummary ? " analysis-panel-summary" : ""}`} aria-live="polite">
-    {detailStatus === "retrying" || statsStatus === "retrying" || trendsStatus === "retrying" || timeseriesStatus === "retrying" || analysisStatus === "retrying" ? <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p> : null}
+    {detailStatus === "retrying" || statsStatus === "retrying" || trendsStatus === "retrying" || timeseriesStatus === "retrying" || analysisStatus === "retrying" ? <p className="analysis-status analysis-status-retry" role="status">⟳ 연결이 지연되어 다시 불러오는 중입니다...</p> : null}
     {detailStatus === "loading" ? <p className="analysis-status" role="status">시설 정보를 불러오는 중...</p> : null}
     {detailStatus === "error" || statsStatus === "error" || trendsStatus === "error" || timeseriesStatus === "error" || analysisStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">일부 정보를 불러오지 못했습니다. <button type="button" onClick={retryData}>다시 시도</button></p> : null}
     <div className="analysis-heading">
@@ -340,7 +340,7 @@ export default function AnalysisPanel() {
       <div className="analysis-summary-trend">
         <div className="analysis-summary-trend-header">
           <span>관련 동향</span>
-          <strong>{trendsStatus === "idle" ? "준비 중..." : trendsStatus === "loading" ? "불러오는 중..." : trendsStatus === "ready" || trendsStatus === "empty" ? `${trends.length}건` : "확인 불가"}</strong>
+          <strong>{trendsStatus === "idle" ? "준비 중..." : trendsStatus === "loading" || trendsStatus === "retrying" ? "불러오는 중..." : trendsStatus === "ready" || trendsStatus === "empty" ? `${trends.length}건` : "확인 불가"}</strong>
         </div>
         {representativeTrend && <div className="analysis-summary-trend-item">
           <small>{formatTrendDate(representativeTrend.date)}</small>
@@ -390,8 +390,6 @@ export default function AnalysisPanel() {
         </>}
       </section>}
 
-      {timeseriesStatus === "retrying" && <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p>}
-      {analysisStatus === "retrying" && <p className="analysis-status" role="status">연결이 지연되어 다시 불러오는 중...</p>}
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">일부 정보를 불러오지 못했습니다. <button type="button" onClick={retryData}>다시 시도</button></p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         {(isCombined || selectedMetric === "nightlight") && <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />}
         {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "산림손실이 관측되지 않았습니다." : "산림 변화 데이터가 없습니다.") : undefined} />}
