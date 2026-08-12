@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import maplibregl from "maplibre-gl";
 import { useAnalysisStore } from "../store";
 import { apiBaseUrl } from "../api";
-import SwipeControl from "./SwipeControl";
 
 class SatelliteRequestError extends Error {
   status: number;
@@ -315,9 +314,45 @@ export default function MapCanvas() {
   const satelliteRequestRef = useRef(0);
   const [satelliteStatus, setSatelliteStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "unavailable">("idle");
   const [satelliteRetryAttempt, setSatelliteRetryAttempt] = useState(0);
-  const swipePositionRef = useRef(0.5);
+  const [swipePosition, setSwipePosition] = useState(0.5);
+  const swipePositionRef = useRef(swipePosition);
+  swipePositionRef.current = swipePosition;
+  const swipeDraggingRef = useRef(false);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const updateSwipePosition = (clientX: number) => {
+    const mapContainer = container.current;
+    if (!mapContainer) return;
+    const rect = mapContainer.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    swipePositionRef.current = ratio;
+    setSwipePosition(ratio);
+    map.current?.triggerRepaint();
+  };
+  const handleSwipePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    swipeDraggingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.dataset.dragging = "true";
+    map.current?.dragPan.disable();
+    updateSwipePosition(event.clientX);
+  };
+  const handleSwipePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!swipeDraggingRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    updateSwipePosition(event.clientX);
+  };
+  const handleSwipePointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!swipeDraggingRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    swipeDraggingRef.current = false;
+    event.currentTarget.dataset.dragging = "false";
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    map.current?.dragPan.enable();
+  };
   const startSatelliteLoad = (currentMap: maplibregl.Map) => {
     const currentState = useAnalysisStore.getState();
     if (!currentState.focusFacility || !currentState.selectedMetric) {
@@ -475,6 +510,12 @@ export default function MapCanvas() {
     if (!map.current) return;
     applyComparisonOpacity(map.current, mode, metric, Boolean(focusFacility));
   }, [focusFacility, metric, mode]);
+  useEffect(() => {
+    if (mode !== "swipe") return;
+    swipePositionRef.current = 0.5;
+    setSwipePosition(0.5);
+    map.current?.triggerRepaint();
+  }, [mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
     {focusFacility && selectedMetric && satelliteStatus !== "ready" && (
@@ -487,15 +528,25 @@ export default function MapCanvas() {
         {satelliteStatus === "unavailable" && <button type="button" onClick={() => { if (map.current) startSatelliteLoad(map.current); }}>다시 시도</button>}
       </div>
     )}
-    <SwipeControl
-      enabled={mode === "swipe"}
-      baseYear={baseYear}
-      compareYear={compareYear}
-      containerRef={container}
-      positionRef={swipePositionRef}
-      onPositionChange={() => map.current?.triggerRepaint()}
-      onDragStart={() => map.current?.dragPan.disable()}
-      onDragEnd={() => map.current?.dragPan.enable()}
-    />
+    <div className={`swipe-control${mode === "swipe" ? " is-enabled" : ""}`} aria-hidden={mode !== "swipe"}>
+      <div className="swipe-label swipe-label-base"><span className="swipe-year-text">{baseYear}년 · 과거</span></div>
+      <div className="swipe-label swipe-label-compare"><span className="swipe-year-text">{compareYear}년 · 비교</span></div>
+      <div className="swipe-rail" style={{ left: `${swipePosition * 100}%` }} />
+      {mode === "swipe" && <span className="swipe-hint">좌우로 끌어 비교</span>}
+      <button
+        type="button"
+        className="swipe-handle"
+        style={{ left: `${swipePosition * 100}%` }}
+        aria-label={`${baseYear}년 기준과 ${compareYear}년 비교 위치 조절`}
+        title="좌우로 드래그하여 비교 위치 조절"
+        onPointerDown={handleSwipePointerDown}
+        onPointerMove={handleSwipePointerMove}
+        onPointerUp={handleSwipePointerEnd}
+        onPointerCancel={handleSwipePointerEnd}
+        onLostPointerCapture={handleSwipePointerEnd}
+      >
+        <span aria-hidden="true">◀ ● ▶</span>
+      </button>
+    </div>
   </>;
 }
