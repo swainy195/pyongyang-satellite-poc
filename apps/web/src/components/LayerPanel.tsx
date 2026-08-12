@@ -44,10 +44,6 @@ export default function LayerPanel() {
     requestIdRef.current += 1;
   }, []);
 
-  useEffect(() => {
-    if (state.metric === "forest" && state.mode === "swipe") state.setMode("difference");
-  }, [state.metric, state.mode]);
-
   async function searchFacilities(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = query.trim();
