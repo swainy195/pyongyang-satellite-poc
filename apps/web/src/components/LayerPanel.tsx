@@ -35,6 +35,10 @@ export default function LayerPanel() {
   const [searchError, setSearchError] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>("idle");
   const requestIdRef = useRef(0);
+  const selectMetric = (metric: Metric) => {
+    state.selectMetric(metric);
+    if (state.focusFacility) state.setAnalysisPanelOpen(true);
+  };
 
   useEffect(() => () => {
     requestIdRef.current += 1;
@@ -121,7 +125,7 @@ export default function LayerPanel() {
         <div className="section-content">
           <h3 id="metric-heading">무엇을 비교할까요?</h3>
           <div className="metric-cards" role="group" aria-label="분석 지표 선택">
-            {metricOptions.map((option) => <button key={option.value} type="button" className={`metric-card metric-${option.value}${state.selectedMetric === option.value ? " is-selected" : ""}`} aria-pressed={state.selectedMetric === option.value} onClick={() => state.selectMetric(option.value)}>
+            {metricOptions.map((option) => <button key={option.value} type="button" className={`metric-card metric-${option.value}${state.selectedMetric === option.value ? " is-selected" : ""}`} aria-pressed={state.selectedMetric === option.value} onClick={() => selectMetric(option.value)}>
               <span className="metric-icon" aria-hidden="true">{option.value === "nightlight" ? "◐" : option.value === "forest" ? "⌁" : "◎"}</span><strong>{option.title}</strong><span>{option.description}</span>
               </button>)}
           </div>

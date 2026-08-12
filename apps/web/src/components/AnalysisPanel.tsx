@@ -39,7 +39,7 @@ function formatValue(value: number | null | undefined, digits = 2) {
 }
 
 function formatArea(value: number | null | undefined) {
-  return value == null || !Number.isFinite(Number(value)) ? "데이터 없음" : `${Number(value).toFixed(3)} km²`;
+  return value == null || !Number.isFinite(Number(value)) ? "산림 변화 데이터가 없습니다." : `${Number(value).toFixed(3)} km²`;
 }
 
 function formatPercent(value: number | null | undefined) {
@@ -228,14 +228,16 @@ export default function AnalysisPanel() {
   const firstNightlight = firstNightlightPoint?.mean_radiance;
   const lastNightlight = lastNightlightPoint?.mean_radiance;
   const nightlightDelta = firstNightlight != null && lastNightlight != null ? lastNightlight - firstNightlight : null;
-  const cumulativeForestLoss = forestPoints.length > 0 ? forestPoints[forestPoints.length - 1].cumulative_loss_km2 : null;
   const nightlightChangePct = firstNightlight != null && firstNightlight !== 0 && lastNightlight != null ? (lastNightlight - firstNightlight) / firstNightlight * 100 : analysis?.nightlightChangePct ?? null;
+  const hasForestObservations = forestPoints.some((point) => point.annual_loss_km2 != null) || analysis?.forestLossKm2 != null;
   const forestLossTotal = stats?.forest.length
-    ? stats.forest.reduce((total, point) => total + Number(point.annual_loss_km2 ?? 0), 0)
+    ? hasForestObservations ? stats.forest.reduce((total, point) => total + Number(point.annual_loss_km2 ?? 0), 0) : null
     : analysis?.forestLossKm2 ?? null;
-  const hasForestObservations = forestPoints.some((point) => point.annual_loss_km2 != null);
+  const cumulativeForestLoss = forestPoints.length > 0
+    ? [...forestPoints].reverse().find((point) => point.cumulative_loss_km2 != null)?.cumulative_loss_km2 ?? (hasForestObservations ? forestLossTotal : null)
+    : hasForestObservations ? forestLossTotal : null;
   const hasObservedForestLoss = forestPoints.some((point) => Number(point.annual_loss_km2) > 0);
-  const period = analysis?.period ?? { start: 2012, end: 2025 };
+  const period = { start: baseYear, end: compareYear };
 
   if (!analysisPanelOpen) return null;
   if (!focus) {
@@ -261,7 +263,13 @@ export default function AnalysisPanel() {
       <span>{facility.address || "주소 정보 없음"}</span>
       {facility.longitude != null && facility.latitude != null && <small>{Number(facility.longitude).toFixed(4)}, {Number(facility.latitude).toFixed(4)}</small>}
     </div>}
-    <p className="analysis-guide">이 시설 주변에서 관측된 야간 불빛과 산림 변화를 확인해보세요.</p>
+    <p className="analysis-guide">{isForest && hasForestObservations && forestLossTotal === 0
+      ? `선택한 시설 주변에서는 ${baseYear}~${compareYear}년 동안 산림손실이 관측되지 않았습니다.`
+      : isForest && !hasForestObservations
+        ? "산림 변화 데이터가 없습니다."
+        : isNightlight
+          ? "이 시설 주변에서 관측된 야간 불빛 변화를 확인해보세요."
+          : "이 시설 주변에서 관측된 야간 불빛과 산림 변화를 확인해보세요."}</p>
 
     {detailStatus === "loading" && <p className="analysis-status" role="status">시설 기본정보를 불러오는 중...</p>}
     {detailStatus === "error" && <p className="analysis-status analysis-status-error" role="alert">시설 기본정보를 불러오지 못했습니다.</p>}
@@ -290,8 +298,10 @@ export default function AnalysisPanel() {
       </div>
       <div className="analysis-detail-grid">
         {(isNightlight || isCombined) && <section className="analysis-detail-card"><strong>야간 불빛</strong><div><span>{firstNightlightPoint?.year ?? period.start}년</span><b>{formatValue(firstNightlight)}</b><span>→ {lastNightlightPoint?.year ?? period.end}년</span><b>{formatValue(lastNightlight)}</b></div><small>절대 변화량 {nightlightDelta == null ? "-" : `${nightlightDelta > 0 ? "+" : ""}${formatValue(nightlightDelta)}`} · Radiance</small></section>}
-        {(isForest || isCombined) && <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 손실 {formatArea(cumulativeForestLoss)}</small></section>}
+        {(isForest || isCombined) && <section className="analysis-detail-card"><strong>산림 변화</strong><div><span>선택 기간 산림손실</span><b>{formatArea(forestLossTotal)}</b></div><small>누적 산림손실 {formatArea(cumulativeForestLoss)}</small></section>}
       </div>
+
+      {isForest && hasForestObservations && forestLossTotal === 0 && <div className="analysis-forest-zero" role="status">선택한 시설 주변에서<br />{baseYear}~{compareYear}년 Hansen 기준 산림손실이<br />관측되지 않았습니다.</div>}
 
       {isCombined && analysis && <>
         {isCombined && <div className="analysis-section analysis-integrated-observation"><strong>종합 관찰</strong><span className="analysis-section-hint">기존 위성 통계와 연결된 공개 동향을 함께 정리한 내용</span><p>{integratedObservation}</p></div>}
@@ -322,7 +332,7 @@ export default function AnalysisPanel() {
 
       {timeseriesStatus === "error" ? <p className="analysis-status analysis-status-error" role="alert">시계열 그래프를 불러오지 못했습니다.</p> : timeseriesStatus === "empty" ? <p className="analysis-status" role="status">시계열 데이터가 없습니다.</p> : <>
         {(isCombined || selectedMetric === "nightlight") && <SeriesChart points={nightlightPoints.map((point) => ({ year: point.year, value: point.mean_radiance }))} value={(point) => Number(point.value ?? 0)} color="#2563eb" label="VIIRS 야간 불빛 연도별 변화" unit=" Radiance" />}
-        {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "선택 기간에 관측된 산림손실이 없습니다." : "산림손실 데이터가 없습니다.") : undefined} />}
+        {(isCombined || selectedMetric === "forest") && <SeriesChart points={forestPoints.map((point) => ({ year: point.year, value: point.annual_loss_km2 }))} value={(point) => Number(point.value ?? 0)} color="#d97706" label="Hansen 산림손실 연도별 변화" unit=" km²" hideZeroBars emptyMessage={!hasObservedForestLoss ? (hasForestObservations ? "산림손실이 관측되지 않았습니다." : "산림 변화 데이터가 없습니다.") : undefined} />}
       </>}
 
       <div className="analysis-sources"><strong>출처</strong><div className="analysis-meta"><span className="confidence-badge">{analysis?.confidence ?? "관측 기반 데이터"}</span><span>{isNightlight ? "시설정보 DB · NOAA VIIRS DNB" : isForest ? "시설정보 DB · Hansen Global Forest Change" : "시설정보 DB · NOAA VIIRS DNB · Hansen Global Forest Change · 관련 동향 데이터"}</span></div></div>
