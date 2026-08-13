@@ -315,6 +315,7 @@ export default function MapCanvas() {
   const [satelliteStatus, setSatelliteStatus] = useState<"idle" | "loading" | "retrying" | "ready" | "unavailable">("idle");
   const [satelliteRetryAttempt, setSatelliteRetryAttempt] = useState(0);
   const [swipePosition, setSwipePosition] = useState(0.5);
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipePositionRef = useRef(swipePosition);
   swipePositionRef.current = swipePosition;
   const swipeDraggingRef = useRef(false);
@@ -332,6 +333,7 @@ export default function MapCanvas() {
   const handleSwipePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    setShowSwipeHint(false);
     swipeDraggingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.dataset.dragging = "true";
@@ -516,6 +518,15 @@ export default function MapCanvas() {
     setSwipePosition(0.5);
     map.current?.triggerRepaint();
   }, [mode]);
+  useEffect(() => {
+    if (mode !== "swipe") {
+      setShowSwipeHint(false);
+      return;
+    }
+    setShowSwipeHint(true);
+    const timeoutId = window.setTimeout(() => setShowSwipeHint(false), 2500);
+    return () => window.clearTimeout(timeoutId);
+  }, [mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
     {focusFacility && selectedMetric && satelliteStatus !== "ready" && (
@@ -532,7 +543,7 @@ export default function MapCanvas() {
       <div className="swipe-label swipe-label-base"><span className="swipe-year-text">{baseYear}년 · 과거</span></div>
       <div className="swipe-label swipe-label-compare"><span className="swipe-year-text">{compareYear}년 · 비교</span></div>
       <div className="swipe-rail" style={{ left: `${swipePosition * 100}%` }} />
-      {mode === "swipe" && <span className="swipe-hint">좌우로 끌어 비교</span>}
+      {mode === "swipe" && showSwipeHint && <span className="swipe-hint">좌우로 끌어 비교</span>}
       <button
         type="button"
         className="swipe-handle"
