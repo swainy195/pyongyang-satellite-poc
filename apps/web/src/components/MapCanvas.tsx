@@ -450,8 +450,23 @@ export default function MapCanvas() {
         currentMap.setFilter("facilities-selected-halo", ["==", ["get", "id"], currentState.focusFacility?.id ?? -1]);
         currentMap.setFilter("facilities-selected", ["==", ["get", "id"], currentState.focusFacility?.id ?? -1]);
         applyFacilityVisualPriority(currentMap, currentState.metric, currentState.mode);
-        currentMap.on("mouseenter", "facilities-points", () => { currentMap.getCanvas().style.cursor = "pointer"; });
-        currentMap.on("mouseleave", "facilities-points", () => { currentMap.getCanvas().style.cursor = ""; });
+        const hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "facility-hover-popup" });
+        currentMap.on("mouseenter", "facilities-points", (event) => {
+          currentMap.getCanvas().style.cursor = "pointer";
+          const feature = event.features?.[0];
+          if (!feature) return;
+          const properties = feature.properties as Record<string, unknown> | undefined;
+          const name = properties?.name ?? properties?.facility_name ?? "시설";
+          const category = properties?.category;
+          hoverPopup
+            .setLngLat(event.lngLat)
+            .setHTML(`<div class="facility-hover-tooltip"><strong>${escapeHtml(name)}</strong>${category ? `<span>${escapeHtml(category)}</span>` : ""}</div>`)
+            .addTo(currentMap);
+        });
+        currentMap.on("mouseleave", "facilities-points", () => {
+          currentMap.getCanvas().style.cursor = "";
+          hoverPopup.remove();
+        });
         currentMap.on("click", "facilities-points", async (event) => {
           const feature = event.features?.[0];
           const facilityId = feature?.properties?.id;

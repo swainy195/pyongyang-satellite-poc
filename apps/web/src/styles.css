@@ -244,6 +244,10 @@ header p { max-width: 760px; }
 .map-caption { border-radius: 8px; padding: 10px 12px; }
 .legend { border-radius: 8px; padding: 10px 12px; }
 .swipe-hint { position: absolute; top: calc(50% + 34px); left: 50%; transform: translateX(-50%); padding: 4px 7px; border: 1px solid #ffffff99; border-radius: 4px; background: #111827aa; color: white; font-size: 10px; white-space: nowrap; pointer-events: none; }
+.facility-hover-tooltip { min-width: 120px; word-break: keep-all; overflow-wrap: break-word; }
+.facility-hover-tooltip strong { display: block; font-size: 13px; font-weight: 700; }
+.facility-hover-tooltip span { display: block; margin-top: 3px; color: #64748b; font-size: 11px; }
+.facility-hover-popup .maplibregl-popup-content { padding: 8px 10px; }
 .analysis-panel { border-radius: 8px; background: #ffffffef; box-shadow: 0 10px 28px #0f172a2b; backdrop-filter: blur(5px); }
 .notice, .map-caption, .legend-helper, .mode-help, .facility-toggle small, .metric-card, .mode-card, .recommended-card, .analysis-panel, .analysis-section-hint, .satellite-status { word-break: keep-all; overflow-wrap: break-word; }
 .analysis-overview { margin: 12px 0 14px; padding: 10px 11px; border-left: 3px solid #2563eb; background: #eff6ff99; }

@@ -41,6 +41,10 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   setYears: (baseYear, compareYear) => set({ baseYear, compareYear }),
   setLayerVisible: (layer, visible) => {
     const key = layer === "boundaries" ? "showBoundaries" : layer === "facilities" ? "showFacilities" : "showTrends";
+    if (layer === "facilities" && visible) {
+      set({ showFacilities: true, selectedMetric: null, analysisPanelOpen: false });
+      return;
+    }
     set({ [key]: visible });
   },
   setFocusFacility: (facility) => set(facility
