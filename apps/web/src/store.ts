@@ -32,9 +32,11 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   focusFacility: null,
   analysisPanelOpen: false,
   setMetric: (metric) => set((state) => ({ metric, selectedMetric: state.focusFacility ? metric : null })),
-  selectMetric: (metric) => set((state) => state.focusFacility
-    ? { metric, selectedMetric: metric, analysisPanelOpen: metric === "combined" ? true : state.analysisPanelOpen }
-    : { metric, selectedMetric: null }),
+  selectMetric: (metric) => set((state) => {
+    if (!state.focusFacility) return { metric, selectedMetric: null };
+    if (metric === "combined") return { metric, selectedMetric: metric, analysisPanelOpen: true };
+    return { metric, selectedMetric: metric, mode: "difference", analysisPanelOpen: true };
+  }),
   setMode: (mode) => set({ mode }),
   setYears: (baseYear, compareYear) => set({ baseYear, compareYear }),
   setLayerVisible: (layer, visible) => {
