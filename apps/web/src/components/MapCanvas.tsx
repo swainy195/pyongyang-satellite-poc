@@ -319,8 +319,8 @@ export default function MapCanvas() {
   const swipePositionRef = useRef(swipePosition);
   swipePositionRef.current = swipePosition;
   const swipeDraggingRef = useRef(false);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
+  const modeRef = useRef<string>(mode);
+  modeRef.current = selectedMetric === "combined" ? "" : mode;
   const updateSwipePosition = (clientX: number) => {
     const mapContainer = container.current;
     if (!mapContainer) return;
@@ -357,7 +357,8 @@ export default function MapCanvas() {
   };
   const startSatelliteLoad = (currentMap: maplibregl.Map) => {
     const currentState = useAnalysisStore.getState();
-    if (!currentState.focusFacility || !currentState.selectedMetric) {
+    if (!currentState.focusFacility || !currentState.selectedMetric || currentState.selectedMetric === "combined") {
+      satelliteRequestRef.current += 1;
       hideSatelliteLayers(currentMap);
       setSatelliteStatus("idle");
       return;
@@ -367,7 +368,14 @@ export default function MapCanvas() {
     setSatelliteRetryAttempt(0);
     hideSatelliteLayers(currentMap);
     void retrySatelliteLoad(
-      () => prepareSatelliteLayers(currentMap, currentState.baseYear, currentState.compareYear, currentState.showTrends, currentState.metric, currentState.mode, true),
+      () => {
+        const latestState = useAnalysisStore.getState();
+        if (requestId !== satelliteRequestRef.current || latestState.selectedMetric === "combined") {
+          hideSatelliteLayers(currentMap);
+          return Promise.resolve();
+        }
+        return prepareSatelliteLayers(currentMap, latestState.baseYear, latestState.compareYear, latestState.showTrends, latestState.metric, latestState.mode, true);
+      },
       (attempt, total) => {
         if (requestId !== satelliteRequestRef.current) return;
         setSatelliteRetryAttempt(attempt);
@@ -376,7 +384,7 @@ export default function MapCanvas() {
     )
       .then(() => {
         const latestState = useAnalysisStore.getState();
-        if (requestId !== satelliteRequestRef.current || !latestState.focusFacility || !latestState.selectedMetric) {
+        if (requestId !== satelliteRequestRef.current || !latestState.focusFacility || !latestState.selectedMetric || latestState.selectedMetric === "combined") {
           hideSatelliteLayers(currentMap);
           setSatelliteStatus("idle");
           return;
@@ -529,7 +537,7 @@ export default function MapCanvas() {
   }, [mode]);
   return <>
     <div className="map" ref={container} aria-label="평양 위성정보 비교 지도" />
-    {focusFacility && selectedMetric && satelliteStatus !== "ready" && (
+    {focusFacility && selectedMetric && selectedMetric !== "combined" && satelliteStatus !== "ready" && (
       <div className={`satellite-status satellite-status-${satelliteStatus}`} role="status">
         {satelliteStatus === "loading"
           ? "위성 레이어 준비 중..."
@@ -539,7 +547,7 @@ export default function MapCanvas() {
         {satelliteStatus === "unavailable" && <button type="button" onClick={() => { if (map.current) startSatelliteLoad(map.current); }}>다시 시도</button>}
       </div>
     )}
-    <div className={`swipe-control${mode === "swipe" ? " is-enabled" : ""}`} aria-hidden={mode !== "swipe"}>
+    {selectedMetric !== "combined" && <div className={`swipe-control${mode === "swipe" ? " is-enabled" : ""}`} aria-hidden={mode !== "swipe"}>
       <div className="swipe-label swipe-label-base"><span className="swipe-year-text">{baseYear}년 · 과거</span></div>
       <div className="swipe-label swipe-label-compare"><span className="swipe-year-text">{compareYear}년 · 비교</span></div>
       <div className="swipe-rail" style={{ left: `${swipePosition * 100}%` }} />
@@ -558,6 +566,6 @@ export default function MapCanvas() {
       >
         <span aria-hidden="true">◀ ● ▶</span>
       </button>
-    </div>
+    </div>}
   </>;
 }
